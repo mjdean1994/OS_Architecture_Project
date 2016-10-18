@@ -7,6 +7,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
 
 // 13 is NOT the correct number -- you fix it!
 #define BYTES_TO_READ_IN_BOOT_SECTOR 512
@@ -26,6 +28,8 @@
 
 FILE* FILE_SYSTEM_ID;
 int BYTES_PER_SECTOR = 512;
+
+bool startsWith(const char *pre, const char *str);
 
 extern int read_sector(int sector_number, char* buffer);
 extern int write_sector(int sector_number, char* buffer);
@@ -73,7 +77,59 @@ int main()
    leastSignificantBits =   ( (int) boot[11] )        & 0x000000ff;
    bytesPerSector = mostSignificantBits | leastSignificantBits;
 	
-   printf("%d\n", bytesPerSector);
+	// Inspired by c-for-dummies.com/blog/?p=1112
+	char *buffer;
+	size_t bufsize = 200;
+	size_t characters;
+	const char delim[2] = " ";
+
+	buffer = (char *)malloc(bufsize * sizeof(char));
+	if(buffer == NULL)
+	{
+		return 1;
+	}
+
+  	while(buffer[0] != '!')
+  	{	
+		characters = getline(&buffer, &bufsize, stdin);
+	
+		char *token;
+		
+		// Gets the number of arguments, delimited by space
+		// Inspired by SO question 13078926
+		int argc = 1;
+		char *ptr = buffer;
+		while((ptr = strchr(ptr, ' ')) != NULL) {
+			argc++;
+			ptr++;
+		}
+		
+		char **argv = malloc(argc * sizeof(char));
+		
+		token = strtok(buffer, delim);
+
+		int i;
+		for(i = 0; i < argc; i++)
+		{
+			argv[i] = malloc(strlen(token) * sizeof(char));
+			argv[i] = token;
+			token = strtok(NULL, delim); 
+		}
+
+		if(startsWith("pbs", argv[0]) == 1)
+		{
+			printf("Print boot sector stuff\n");
+		}
+   	}   
+
 
    return 0;
+}
+
+// From SO question 4770985
+bool startsWith(const char *pre, const char *str)
+{
+	size_t lenpre = strlen(pre),
+	       lenstr = strlen(str);
+	return lenstr < lenpre ? false : strncmp(pre, str, lenpre) == 0;
 }
