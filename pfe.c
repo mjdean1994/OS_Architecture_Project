@@ -35,7 +35,17 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	FILE_SYSTEM_ID = fopen("floppy1", "r+");
+	int shmId;
+	pid_t parent = getpid();
+
+	SharedMemory sharedMemory;
+
+	//Inspired by https://beej.us/guide/bgipc/output/html/multipage/shm.html
+	shmId = shmget(SHM_KEY, sizeof(SharedMemory), 0666 | IPC_CREAT);
+
+	sharedMemory = shmat(shmid, (void *) 0, 0);
+
+	FILE_SYSTEM_ID = fopen(sharedMemory.currentDirectory, "r+");
 
 	if(FILE_SYSTEM_ID == NULL)
 	{
