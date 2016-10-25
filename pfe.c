@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "sharedMemory.h"
 
 FILE* FILE_SYSTEM_ID;
 int BYTES_PER_SECTOR = 512;
@@ -26,6 +27,7 @@ int main(int argc, char **argv)
 
 	if(argc != 3)
 	{
+		printf("Wrong number of arguments. Usage: pfe x y\n");
 		return 1;
 	}
 	int x = atoi(argv[1]);
@@ -35,7 +37,12 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	FILE_SYSTEM_ID = fopen("floppy1", "r+");
+	//Inspired by https://beej.us/guide/bgipc/output/html/multipage/shm.html
+ 	int shmId = shmget((key_t) 8675308, sizeof(char), 0666 | IPC_CREAT);
+ 
+ 	SharedMemory *sharedMemory = (SharedMemory *)shmat(shmId, (void *) 0, 0);
+ 
+	FILE_SYSTEM_ID = fopen(sharedMemory->floppyImageName, "r+");
 
 	if(FILE_SYSTEM_ID == NULL)
 	{
@@ -71,7 +78,7 @@ int checkRange(int x, int y)
 
 char* readFAT12Table(int fatIndex, int x, int y)
 {
-	unsigned char* fat = (char*)malloc(BYTES_PER_SECTOR * FAT_SECTORS_NUM);
+	unsigned char* fat = (unsigned char*)malloc(BYTES_PER_SECTOR * FAT_SECTORS_NUM);
 	int i;
 
 	// 9 because there are 9 fat sectors

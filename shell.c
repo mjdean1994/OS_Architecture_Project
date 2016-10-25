@@ -23,13 +23,13 @@ extern void set_fat_entry(int fat_entry_number, int value, char* fat);
 
 int main()
 {
-	unsigned char* boot;            // example buffer
+	char* boot;            // example buffer
 	int mostSignificantBits;
 	int leastSignificantBits;
 	int bytesPerSector;
 
 	// Use this for an image of a floppy drive
-	FILE_SYSTEM_ID = fopen("floppy1", "r+");
+	FILE_SYSTEM_ID = fopen(FLOPPY_IMAGE_NAME, "r+");
 
 	if (FILE_SYSTEM_ID == NULL)
 	{
@@ -42,7 +42,7 @@ int main()
 
 	// Then reset it per the value in the boot sector
 
-	boot = (unsigned char*) malloc(BYTES_PER_SECTOR * sizeof(unsigned char));
+	boot = (char*) malloc(BYTES_PER_SECTOR * sizeof(char));
 
 	if (read_sector(0, boot) == -1)
 	{
@@ -73,6 +73,14 @@ int runShell()
 	int forkResult = 0;
 	pid_t parent = getpid();
 
+ 	//Inspired by https://beej.us/guide/bgipc/output/html/multipage/shm.html
+ 	int shmId = shmget((key_t) 8675308, sizeof(char), 0666 | IPC_CREAT);
+ 
+ 	SharedMemory *sharedMemory = (SharedMemory *)shmat(shmId, (void *) 0, 0);
+ 
+ 	strcpy(sharedMemory->currentDirectory, "/");
+ 	strcpy(sharedMemory->floppyImageName, FLOPPY_IMAGE_NAME);
+
 	do
 	{
 		// Don't need to allocate. Getline does it for us. FUUUUUTURE.
@@ -100,7 +108,9 @@ int runShell()
 		free(input);
 		free(argv);
 		
-	} while(argc != 0 /*&& strcmp(argv[0], "exit")*/);
+	} while(argc != 0 && strcmp(argv[0], "exit"));
+
+	shmctl(shmId, IPC_RMID, NULL);
 
 	return 0;
 }

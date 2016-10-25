@@ -2,17 +2,26 @@
 #include "fatSupport.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "sharedMemory.h"
 
 FILE* FILE_SYSTEM_ID;
 int BYTES_PER_SECTOR = 512;
 
 struct bootInfo BOOT_SECTOR;
 
+void readBootSector(unsigned char* boot);
+void printBootSector();
+
 int main()
 {	
 	unsigned char* boot;
 
-	FILE_SYSTEM_ID = fopen("floppy1", "r+");
+	//Inspired by https://beej.us/guide/bgipc/output/html/multipage/shm.html
+ 	int shmId = shmget((key_t) 8675308, sizeof(char), 0666 | IPC_CREAT);
+ 
+ 	SharedMemory *sharedMemory = (SharedMemory *)shmat(shmId, (void *) 0, 0);
+ 
+	FILE_SYSTEM_ID = fopen(sharedMemory->floppyImageName, "r+");
 
 	if (FILE_SYSTEM_ID == NULL)
    	{
@@ -82,7 +91,7 @@ void readBootSector(unsigned char* boot)
 	BOOT_SECTOR.hexVolumeID = endBits | mid2Bits | mid1Bits | startBits;
 
 	int byteNum = 43;
-	for(index; index < 11; index = index + 1){
+	for(; index < 11; index = index + 1){
 		BOOT_SECTOR.volLabel[index] = ((char) boot[byteNum]);
 		byteNum = byteNum + 1;
 	}
