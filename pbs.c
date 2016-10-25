@@ -1,4 +1,5 @@
 #include "bootInfo.h"
+#include "fatSupport.h"
 #include <stdio.h>
 #include <stdlib.h>
 

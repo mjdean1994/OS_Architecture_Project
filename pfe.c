@@ -10,8 +10,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "fatSupport.h"
-
 FILE* FILE_SYSTEM_ID;
 int BYTES_PER_SECTOR = 512;
 

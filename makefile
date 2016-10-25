@@ -1,23 +1,7 @@
-IDIR =../include
-CC=gcc
-CFLAGS=-I$(IDIR)
+all: shell pbs
 
-ODIR=obj
-LDIR =../lib
+shell: shell.c
+	gcc -o shell shell.c fatSupport.c -I.
 
-_DEPS = fatSupport.h bootInfo.h
-DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
-
-_OBJ = fatSupport.o pbs.o
-OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
-
-$(ODIR)/%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
-
-shell: $(OBJ)
-	gcc -o $@ $^ $(CFLAGS)
-
-.PHONY: clean
-
-clean:
-	rm -f $(ODIR)/*.o *~ core $(INCDIR)/*~
+pbs: pbs.c
+	gcc -o pbs pbs.c fatSupport.c -I.

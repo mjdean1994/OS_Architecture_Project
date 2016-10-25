@@ -1,4 +1,65 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "shell.h"
+
+#define BYTES_TO_READ_IN_BOOT_SECTOR 512
+
+FILE* FILE_SYSTEM_ID;
+int BYTES_PER_SECTOR = 512;
+
+int runShell();
+int forkAndExec(char **argv, int count);
+int split(char *input, char ***argv);
+
+extern pid_t waitpid(pid_t pid , int *status, int options); 
+
+
+extern int read_sector(int sector_number, char* buffer);
+extern int write_sector(int sector_number, char* buffer);
+
+extern int  get_fat_entry(int fat_entry_number, char* fat);
+extern void set_fat_entry(int fat_entry_number, int value, char* fat);
+
+int main()
+{
+	unsigned char* boot;            // example buffer
+	int mostSignificantBits;
+	int leastSignificantBits;
+	int bytesPerSector;
+
+	// Use this for an image of a floppy drive
+	FILE_SYSTEM_ID = fopen("floppy1", "r+");
+
+	if (FILE_SYSTEM_ID == NULL)
+	{
+		printf("Could not open the floppy drive or image.\n");
+		exit(1);
+	}
+
+	// Set it to this only to read the boot sector
+	BYTES_PER_SECTOR = BYTES_TO_READ_IN_BOOT_SECTOR;
+
+	// Then reset it per the value in the boot sector
+
+	boot = (unsigned char*) malloc(BYTES_PER_SECTOR * sizeof(unsigned char));
+
+	if (read_sector(0, boot) == -1)
+	{
+		printf("Something has gone wrong -- could not read the boot sector\n");
+		return -1;
+	}
+
+	// 12 (not 11) because little endian
+	mostSignificantBits  = ( ( (int) boot[12] ) << 8 ) & 0x0000ff00;
+	leastSignificantBits =   ( (int) boot[11] )        & 0x000000ff;
+	bytesPerSector = mostSignificantBits | leastSignificantBits;
+	
+	int code = runShell();
+
+ 	return 0; 
+}
+
 
 /*
 	Summary:	Executes the functionality to run the shell, looping until
@@ -9,6 +70,8 @@ int runShell()
 {
 	char **argv;
 	int argc = 0;
+	int forkResult = 0;
+	pid_t parent = getpid();
 
 	do
 	{
@@ -29,18 +92,9 @@ int runShell()
 		}*/
 		// END DEBUG*/
 
-		if(strcmp(argv[0], "pbs") == 0)
-		{
-			printf("Printing the boot sector...add that code here.\n");
-		}
-		else if(strcmp(argv[0], "pfe") == 0)
-		{
-			printf("Printing fat entries...add that code here.\n");
-		}
-		else
-		{
-			printf("Error: Unknown command.\n");
-		}
+
+		//strcmp(argv[0], "pbs") == 0
+		forkResult = forkAndExec(argv, argc);
 
 		// Free memory allocated to the initial input string
 		free(input);
@@ -49,6 +103,56 @@ int runShell()
 	} while(argc != 0 /*&& strcmp(argv[0], "exit")*/);
 
 	return 0;
+}
+/*
+	Summary:	Creates a fork and runs child process with exec.
+	Parameters:
+		argv	The string array with shell arguments.
+	Return:		An integer that represents the forked child exit code.
+*/
+int forkAndExec(char **argv, int count)
+{
+	pid_t child = fork();
+	int status;
+
+	if(child == -1)
+	{
+		//failed to fork, god save us
+	}
+	else if(child > 0)
+	{
+		//parent wait, synchronous execution for now
+		waitpid(child, &status, 0);
+	}
+	else
+	{
+		char filePath[30];
+		strcpy(filePath, "./");
+		strcpy(filePath, argv[0]);		
+
+		if(count == 1)
+		{
+			execl(filePath, filePath, (char*)NULL);
+			_exit(EXIT_FAILURE);
+		}
+		else if(count == 2)
+		{
+			execl(filePath, filePath, argv[1], (char*)NULL);
+			_exit(EXIT_FAILURE);
+		}
+		else if(count == 3)
+		{
+			execl(filePath, filePath, argv[1], argv[2], (char*)NULL);
+			_exit(EXIT_FAILURE);
+		}
+		else
+		{
+			//invalid input, (max 2 additional arguments)
+			//check and quit here or in main?
+			printf("Too many var\n");
+		}
+	}
+	return status;
 }
 
 /*
