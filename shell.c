@@ -1,4 +1,25 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "shell.h"
+
+#define BYTES_TO_READ_IN_BOOT_SECTOR 512
+
+FILE* FILE_SYSTEM_ID;
+int BYTES_PER_SECTOR = 512;
+
+int runShell();
+int forkAndExec(char **argv, int count);
+int split(char *input, char ***argv);
+
+extern pid_t waitpid(pid_t pid , int *status, int options); 
+
+
+extern int read_sector(int sector_number, char* buffer);
+extern int write_sector(int sector_number, char* buffer);
+
+extern int  get_fat_entry(int fat_entry_number, char* fat);
+extern void set_fat_entry(int fat_entry_number, int value, char* fat);
 
 int main()
 {
@@ -8,14 +29,17 @@ int main()
 	int bytesPerSector;
 
 	// Use this for an image of a floppy drive
-	FILE_SYSTEM_ID = fopen(FLOPPY_IMAGE_NAME, "r+");
+	FILE_SYSTEM_ID = fopen("floppy1", "r+");
 
 	if (FILE_SYSTEM_ID == NULL)
 	{
 		printf("Could not open the floppy drive or image.\n");
 		exit(1);
 	}
-	
+
+	// Set it to this only to read the boot sector
+	BYTES_PER_SECTOR = BYTES_TO_READ_IN_BOOT_SECTOR;
+
 	// Then reset it per the value in the boot sector
 
 	boot = (unsigned char*) malloc(BYTES_PER_SECTOR * sizeof(unsigned char));
@@ -23,7 +47,7 @@ int main()
 	if (read_sector(0, boot) == -1)
 	{
 		printf("Something has gone wrong -- could not read the boot sector\n");
-		exit(-1);
+		return -1;
 	}
 
 	// 12 (not 11) because little endian
@@ -47,26 +71,7 @@ int runShell()
 	char **argv;
 	int argc = 0;
 	int forkResult = 0;
-	char *currentDirectory = "/";
-
-	int shmId;
 	pid_t parent = getpid();
-
-	SharedMemory *sharedMemory;
-
-	//Inspired by https://beej.us/guide/bgipc/output/html/multipage/shm.html
-	shmId = shmget((key_t) 8675308, sizeof(SharedMemory), 0666 | IPC_CREAT);
-
-	sharedMemory = (SharedMemory *) shmat(shmId, (void *) 0, 0);
-
-	strcpy(sharedMemory->currentDirectory, currentDirectory);
-	strcpy(sharedMemory->floppyImageName, FLOPPY_IMAGE_NAME);
-
-	if(shmId < 0)
-	{
-			printf("Fatal Error: Failed to read from shared memory.\n");
-			exit(2);
-	}
 
 	do
 	{
@@ -88,7 +93,6 @@ int runShell()
 		// END DEBUG*/
 
 
-
 		//strcmp(argv[0], "pbs") == 0
 		forkResult = forkAndExec(argv, argc);
 
@@ -97,8 +101,6 @@ int runShell()
 		free(argv);
 		
 	} while(argc != 0 /*&& strcmp(argv[0], "exit")*/);
-
-	shmctl(shmId, IPC_RMID, NULL);
 
 	return 0;
 }
