@@ -12,7 +12,7 @@ struct bootInfo BOOT_SECTOR;
 void readBootSector(unsigned char* boot);
 void printBootSector();
 
-int main()
+int main(int argc, char **argv)
 {	
 	unsigned char* boot;
 
