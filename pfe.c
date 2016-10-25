@@ -12,9 +12,13 @@
 
 FILE* FILE_SYSTEM_ID;
 int BYTES_PER_SECTOR = 512;
+int FAT_SECTORS_NUM = 9;
 
 int checkRange(int, int);
 char* readFAT12Table(int, int, int);
+
+extern int read_sector(int sector_number, char* buffer);
+extern unsigned int get_fat_entry(int fat_entry_number, char* fat);
 
 int main(int argc, char **argv)
 {
@@ -44,7 +48,7 @@ int main(int argc, char **argv)
 	int i;
 	for(i = x; i <= y; i++)
 	{
-		printf("%c\n", fat[i * 512]);
+		printf("Entry %d: %x\n", i, get_fat_entry(i, fat));
 	}
 
 	return 0;
@@ -67,11 +71,13 @@ int checkRange(int x, int y)
 
 char* readFAT12Table(int fatIndex, int x, int y)
 {
-	unsigned char* fat = (char*)malloc ( (512 * ((y-x) + 1)) * sizeof (char));
+	unsigned char* fat = (char*)malloc(BYTES_PER_SECTOR * FAT_SECTORS_NUM);
 	int i;
-	for(i = x; i <= y; i++)
+
+	// 9 because there are 9 fat sectors
+	for(i = 0; i <= FAT_SECTORS_NUM; i++)
 	{
-		read_sector(i+1, &fat[i * 512]);
+		read_sector(i + 1, &fat[i * BYTES_PER_SECTOR]);
 	}
 	return fat;	
 	
