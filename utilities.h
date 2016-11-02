@@ -186,7 +186,7 @@ void set_fat_entry(int fat_entry_number, int value, unsigned char* fat)
    }
 }
 
-char* readFAT12Table(int fatIndex, int x, int y)
+char* readFAT12Table(int fatIndex)
 {
    unsigned char* fat = (unsigned char*)malloc(BYTES_PER_SECTOR * FAT_SECTORS_NUM);
    int i;

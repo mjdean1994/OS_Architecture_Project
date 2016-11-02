@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 		return 3;
 	}
 
-	char *fat = readFAT12Table(1, x, y);
+	char *fat = readFAT12Table(1);
 
 	int i;
 	fflush(stdout);
