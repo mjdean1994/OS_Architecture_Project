@@ -37,12 +37,19 @@ int main(int argc, char **argv)
    	{
    		flc = searchForDirectory(argv[1], sharedMemory->firstLogicalCluster);
 
+   		if(flc == -2)
+	   	{
+	   		return 0;
+	   	}
+
    		if(flc < 0)
    		{
-   			printf("File or directory not found.");
+   			printf("File or directory not found.\n");
    			exit(1);
    		}
    	}
+
+
 
    	// as outlined in spec.
    	int realCluster;
@@ -55,8 +62,8 @@ int main(int argc, char **argv)
    	int fatEntry;
 
    	do
-	   	{
-	   		if(flc == 0)
+	{
+	   	if(flc == 0)
 	   	{
 	   		realCluster = 19;
 	   	}
@@ -110,8 +117,7 @@ int main(int argc, char **argv)
 	   		}
 	   		file.extension[i] = '\0';
 
-	   		file.attributes = malloc(1 * sizeof(char));
-	   		file.attributes[0] = startOfEntry[11];
+	   		file.attributes = startOfEntry[11];
 
 	   		offset = 26;
 	   		file.flc = ((((int) startOfEntry[offset + 1]) << 8 ) & 0x0000ff00)
@@ -124,10 +130,10 @@ int main(int argc, char **argv)
 			| (((int) startOfEntry[offset]) & 0x000000ff);	
 
 	   		// Don't output if it has the attribute of a long file name, as per spec
-	   		if(file.attributes[0] != 0x0F)
+	   		if(file.attributes != 0x0F)
 	   		{
 	   			//if it's a subdirectory
-	   			if((file.attributes[0] & 0x10) == 0x10)
+	   			if((file.attributes & 0x10) == 0x10)
 	   			{
 	   				printf("%-15s | DIR  |      0 | %4d\n", file.filename, file.flc);
 	   			}

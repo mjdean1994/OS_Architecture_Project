@@ -9,7 +9,7 @@ typedef struct _fileStructure
 {
    char *filename;
    char *extension;
-   char *attributes;
+   char attributes;
    char *reserved;
    char *creationTime;
    char *creationDate;
@@ -186,6 +186,18 @@ void set_fat_entry(int fat_entry_number, int value, unsigned char* fat)
    }
 }
 
+char* readFAT12Table(int fatIndex, int x, int y)
+{
+   unsigned char* fat = (unsigned char*)malloc(BYTES_PER_SECTOR * FAT_SECTORS_NUM);
+   int i;
+
+   // 9 because there are 9 fat sectors
+   for(i = 0; i <= FAT_SECTORS_NUM; i++)
+   {
+      read_sector(i + 1, &fat[i * BYTES_PER_SECTOR]);
+   }
+   return fat;   
+}
 
 /*
 	Summary:	Spilts the given input string where ' ' is the delimiting
@@ -231,79 +243,97 @@ int split(char *input, char ***argv, char *delimiter)
 
 int searchForEntryInCurrentDirectory(char *targetName, int currentLogicalCluster)
 {
+   int flc = currentLogicalCluster;
+
    // as outlined in spec.
-      int realCluster;
+   int realCluster;
 
-      unsigned char *buffer;
-      buffer = malloc(BYTES_PER_SECTOR * sizeof(char));
+   unsigned char *buffer;
+   buffer = malloc(BYTES_PER_SECTOR * sizeof(char));
 
-      char *fat = readFAT12Table(1, 0, 11);
+   char *fat = readFAT12Table(1, 0, 11);
 
-      int fatEntry;
+   int fatEntry;
 
-      do
+   do
+      {
+         if(flc == 0)
+      {
+         realCluster = 19;
+      }
+      else
+      {
+         realCluster = 31 + flc;
+      }
+
+      fatEntry = get_fat_entry(flc, fat);
+
+      //foreach cluster in current dir
+      int clusterBytes = read_sector(realCluster, buffer);
+
+      //for each entry in cluster
+      int entryIndex;
+
+      for(entryIndex = 0; entryIndex < 16; entryIndex++)
+      {
+         FileStructure file;
+
+         char *startOfEntry = buffer + (32 * entryIndex);
+         if(startOfEntry[0] == 0x00)
          {
-            if(flc == 0)
-         {
-            realCluster = 19;
+            //if it's zero, there's nothing else in the directory
+            break;
          }
-         else
+         if(startOfEntry[0] == 0xE5 || startOfEntry[0] == 0xffffffe5)
          {
-            realCluster = 31 + flc;
+            //if it's E5, this is empty. Ignore it.
+            continue;
          }
 
-         fatEntry = get_fat_entry(flc, fat);
+         int i;
+         int offset = 0;
 
-         //foreach cluster in current dir
-         int clusterBytes = read_sector(realCluster, buffer);
-
-         printf("%-15s | %-4s | %-6s | %-4s", "NAME", "TYPE", "SIZE", "FLC\n");
-         printf("----------------|------|--------|-----\n");
-
-         //for each entry in cluster
-         int entryIndex;
-
-         for(entryIndex = 0; entryIndex < 16; entryIndex++)
+         file.filename = malloc(9 * sizeof(char));
+         for(i = 0; i < 8 && startOfEntry[offset + i] != ' ' && startOfEntry[offset + i] != '\0'; i++)
          {
-            FileStructure file;
+            file.filename[i] = startOfEntry[offset + i];
+         }
+         file.filename[i] = '\0';
 
-            char *startOfEntry = buffer + (32 * entryIndex);
-            if(startOfEntry[0] == 0x00)
-            {
-               //if it's zero, there's nothing else in the directory
-               break;
-            }
-            if(startOfEntry[0] == 0xE5 || startOfEntry[0] == 0xffffffe5)
-            {
-               //if it's E5, this is empty. Ignore it.
-               continue;
-            }
+         file.extension = malloc(4 * sizeof(char));
+         offset = 8;
+         for(i = 0; i < 3 && startOfEntry[offset + i] != '\0'; i++)
+         {
+            file.extension[i] = startOfEntry[offset + i];
+         }
+         file.extension[i] = '\0';
 
-            int i;
-            int offset = 0;
-            
-            file.filename = malloc(9 * sizeof(char));
-            for(i = 0; i < 8 && startOfEntry[offset + i] != ' ' && startOfEntry[offset + i] != '\0'; i++)
-            {
-               file.filename[i] = startOfEntry[offset + i];
-            }
-            file.filename[i] = '\0';
+         file.attributes = startOfEntry[11];
 
-            file.attributes = malloc(1 * sizeof(char));
-            file.attributes[0] = startOfEntry[11];
+         offset = 26;
+         file.flc = ((((int) startOfEntry[offset + 1]) << 8 ) & 0x0000ff00)
+         | (((int) startOfEntry[offset + 0]) & 0x000000ff);
 
-            offset = 26;
-            file.flc = ((((int) startOfEntry[offset + 1]) << 8 ) & 0x0000ff00)
-            | (((int) startOfEntry[offset + 0]) & 0x000000ff);
-
-            if(strcmp(file.filename, targetName) == 0)
+         if(strcmp(file.filename, targetName) == 0)
+         {
+            if((file.attributes & 0x10) == 0x10)
             {
                return file.flc;
             }
+            else
+            {
+               printf("%-15s | %-4s | %-6s | %-4s", "NAME", "TYPE", "SIZE", "FLC\n");
+               printf("----------------|------|--------|-----\n");
+               printf("%-15s | FILE | %6d | %4d\n", strcat(strcat(file.filename, "."), file.extension), file.fileSize, file.flc);
+               return -2;
+            }
          }
+      }
 
-         flc = fatEntry;
-      }while(fatEntry > 0x00 && fatEntry < 0xFF0);
+      flc = fatEntry;
+   }while(fatEntry > 0x00 && fatEntry < 0xFF0);
+
+   return -1;
 }
 
 int searchForDirectory(char *directoryPath, int currentLogicalCluster)
@@ -323,26 +353,22 @@ int searchForDirectory(char *directoryPath, int currentLogicalCluster)
 	char **pathComponents;
 
 	int depth = split(directoryPath, &pathComponents, "/\n");
-
+   printf("%d\n", depth);
    //if that directory exists, we need to loop this many times
-   for(int i = 0; i < depth; i++)
-   {
-      currentLogicalCluster = searchForEntryInCurrentDirectory(pathComponents[depth], currentLogicalCluster);
-   }
-
-	return 1;
-}
-
-char* readFAT12Table(int fatIndex, int x, int y)
-{
-   unsigned char* fat = (unsigned char*)malloc(BYTES_PER_SECTOR * FAT_SECTORS_NUM);
    int i;
-
-   // 9 because there are 9 fat sectors
-   for(i = 0; i <= FAT_SECTORS_NUM; i++)
+   for(i = 0; i < depth; i++)
    {
-      read_sector(i + 1, &fat[i * BYTES_PER_SECTOR]);
+      int cluster = searchForEntryInCurrentDirectory(pathComponents[i], currentLogicalCluster);
+      if(currentLogicalCluster == -1)
+      {
+         return -1;
+      }
+      if(cluster == -2)
+      {
+         return -2;
+      }
+      currentLogicalCluster = cluster;
    }
-   return fat; 
-   
+
+	return currentLogicalCluster;
 }
