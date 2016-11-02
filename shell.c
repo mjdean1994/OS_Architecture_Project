@@ -2,15 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include "shell.h"
+#include "utilities.h"
 
 #define BYTES_TO_READ_IN_BOOT_SECTOR 512
 
 FILE* FILE_SYSTEM_ID;
-int BYTES_PER_SECTOR = 512;
 
 int runShell();
 int forkAndExec(char **argv, int count);
-int split(char *input, char ***argv);
 
 extern pid_t waitpid(pid_t pid , int *status, int options); 
 
@@ -80,6 +79,7 @@ int runShell()
  
  	strcpy(sharedMemory->currentDirectory, "/");
  	strcpy(sharedMemory->floppyImageName, FLOPPY_IMAGE_NAME);
+ 	sharedMemory->firstLogicalCluster = 0;
 
 	do
 	{
@@ -88,7 +88,7 @@ int runShell()
 
 		printf("> ");
 		getline(&input, &MAX_INPUT_LENGTH, stdin);
-		argc = split(input, &argv);
+		argc = split(input, &argv, " \n");
 
 		// START DEBUG
 		/*printf("argc=[%d]\n", argc);
@@ -138,8 +138,7 @@ int forkAndExec(char **argv, int count)
 	{
 		char filePath[30];
 		strcpy(filePath, "./");
-		strcpy(filePath, argv[0]);		
-
+		strcat(filePath, argv[0]);		
 		if(count == 1)
 		{
 			execl(filePath, filePath, (char*)NULL);
@@ -163,47 +162,4 @@ int forkAndExec(char **argv, int count)
 		}
 	}
 	return status;
-}
-
-/*
-	Summary:	Spilts the given input string where ' ' is the delimiting
-				character.
-	Parameters:
-		input 	The string to be split
-		argv	The string array to fill with the split array
-	Return:		An integer that represents the number of elements in argv
-*/
-int split(char *input, char ***argv)
-{
-	const char *delimiter = " \n";
-	int count = 0;
-
-	char *freshInput = malloc(MAX_INPUT_LENGTH * sizeof(char));
-	freshInput = strdup(input);
-
-	char *token;
-
-	token = strtok(input, delimiter);
-
-	while(token != NULL)
-	{
-		token = strtok(NULL, delimiter);	// Get next token
-		count++;
-	}
-
-	// Allocate space for the arguments
-	*argv = malloc(count * sizeof(char*));
-
-	token = strtok(freshInput, delimiter);
-	int i = 0;	// Index of array
-
-	while(token != NULL && token[0] != '\n')
-	{
-		(*argv)[i] = strdup(token);
-		token = strtok(NULL, delimiter);	// Get next token
-		i++;
-	}
-
-	free(freshInput);
-	return count;
 }

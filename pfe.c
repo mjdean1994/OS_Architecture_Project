@@ -1,5 +1,4 @@
 /*
- *
  * Error Codes:
  * ------------
  *  1 - Wrong amount of arguments
@@ -10,16 +9,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "sharedMemory.h"
+#include "utilities.h"
 
 FILE* FILE_SYSTEM_ID;
-int BYTES_PER_SECTOR = 512;
-int FAT_SECTORS_NUM = 9;
 
 int checkRange(int, int);
-char* readFAT12Table(int, int, int);
-
-extern int read_sector(int sector_number, char* buffer);
-extern unsigned int get_fat_entry(int fat_entry_number, char* fat);
 
 int main(int argc, char **argv)
 {
@@ -53,6 +47,7 @@ int main(int argc, char **argv)
 	char *fat = readFAT12Table(1, x, y);
 
 	int i;
+	fflush(stdout);
 	for(i = x; i <= y; i++)
 	{
 		printf("Entry %d: %x\n", i, get_fat_entry(i, fat));
@@ -74,18 +69,4 @@ int checkRange(int x, int y)
 		return 1;
 	}
 	return 0;
-}
-
-char* readFAT12Table(int fatIndex, int x, int y)
-{
-	unsigned char* fat = (unsigned char*)malloc(BYTES_PER_SECTOR * FAT_SECTORS_NUM);
-	int i;
-
-	// 9 because there are 9 fat sectors
-	for(i = 0; i <= FAT_SECTORS_NUM; i++)
-	{
-		read_sector(i + 1, &fat[i * BYTES_PER_SECTOR]);
-	}
-	return fat;	
-	
 }
