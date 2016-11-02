@@ -187,7 +187,7 @@ void set_fat_entry(int fat_entry_number, int value, unsigned char* fat)
    }
 }
 
-char* readFAT12Table(int fatIndex)
+unsigned char* readFAT12Table(int fatIndex)
 {
    unsigned char* fat = (unsigned char*)malloc(BYTES_PER_SECTOR * FAT_SECTORS_NUM);
    int i;
@@ -252,7 +252,7 @@ int searchForEntryInCurrentDirectory(char *targetName, int currentLogicalCluster
    unsigned char *buffer;
    buffer = malloc(BYTES_PER_SECTOR * sizeof(char));
 
-   char *fat = readFAT12Table(1);
+   unsigned char *fat = readFAT12Table(1);
 
    int fatEntry;
 
@@ -279,12 +279,13 @@ int searchForEntryInCurrentDirectory(char *targetName, int currentLogicalCluster
       {
          FileStructure file;
 
-         char *startOfEntry = buffer + (32 * entryIndex);
+         unsigned char *startOfEntry = buffer + (32 * entryIndex);
          if(startOfEntry[0] == 0x00)
          {
             //if it's zero, there's nothing else in the directory
             break;
          }
+         //I realize this line doesn't make any sense. Refactor needed.
          if(startOfEntry[0] == 0xE5 || startOfEntry[0] == 0xffffffe5)
          {
             //if it's E5, this is empty. Ignore it.
@@ -372,4 +373,177 @@ int searchForDirectory(char *directoryPath, int currentLogicalCluster)
    }
 
 	return currentLogicalCluster;
+}
+
+/*
+   Summary: Searches for the existance of a directory within a given directory
+      targetName     the name of the directory to find
+      flc            The first logical cluster of the current dir
+   Return:  the first logical cluster of the found directory
+            or -1 if the directory is not found
+            or -2 if the specified path points to a file
+*/
+int new_searchDirectoryForSubdirectory(char *targetName, int flc)
+{
+   unsigned char *fat = readFAT12Table(1);
+   int nextCluster;
+   // Loop through all clusters...
+   do
+   {
+      nextCluster = get_fat_entry(flc, fat);
+      unsigned char *clusterBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
+
+      int realCluster;
+      if(flc == 0)
+      {
+         realCluster = 19;
+      }
+      else
+      {
+         realCluster = 31 + flc;
+      }
+
+      int numBytes = read_sector(realCluster, clusterBytes);
+
+
+      int j;
+      // loop through each entry in cluster...
+      for(j = 0; j < 16; j++)
+      {
+         FileStructure file;
+         int entryOffset = j * 32;
+
+         file.filename = malloc(9 * sizeof(char));
+         int k;
+         // loop through each character of the filename
+         for(k = 0; k < 8 && clusterBytes[entryOffset + k] != ' ' && clusterBytes[entryOffset + k] != '\0'; k++)
+         {
+            file.filename[k] = clusterBytes[entryOffset + k];
+         }
+         file.filename[k] = '\0'; 
+
+         if(strcmp(file.filename, targetName) == 0)
+         {
+            file.attributes = clusterBytes[entryOffset + 11];
+            // if it isn't a directory (aka a file), return -2
+            if((file.attributes & 0x10) != 0x10)
+            {
+               return -2;
+            }
+
+            file.flc = ((((int) clusterBytes[entryOffset + 27]) << 8 ) & 0x0000ff00)
+            | (((int) clusterBytes[entryOffset + 26]) & 0x000000ff);
+            free(file.filename);
+            return file.flc;
+         }
+
+      }
+
+      if(nextCluster > 0x00 && nextCluster < 0xFF0)
+      {
+         flc = nextCluster;
+      }
+   } while (nextCluster > 0x00 && nextCluster < 0xFF0);
+
+   return -1;
+}
+
+/*
+   Summary: Searches for the existance of a directory at the given path
+   Parameters:
+      targetPath     The absolute or relative path to the directory
+      flc            The first logical cluster of the current dir
+   Return:  the first logical cluster of the found directory
+            or -1 if the directory is not found
+            or -2 if the specified path points to a file
+*/
+int new_searchForDirectory(char *targetPath, int flc)
+{
+   if(targetPath[0] == '/')
+   {
+      flc = 0;
+   }
+
+   if(strcmp(targetPath, "/") == 0)
+   {
+      return 0;
+   }
+
+   char **directoryComponents = malloc(MAX_INPUT_LENGTH * sizeof(char));
+
+   int depth = split(targetPath, &directoryComponents, "/\n");
+
+   int i;
+
+   // if the directory does exist, this loop will execute exactly
+   // enough times to get us there
+   for(i = 0; i < depth; i++)
+   {
+         flc = new_searchDirectoryForSubdirectory(directoryComponents[i], flc);
+         // if we get an error, spit it back immediately.
+         if(flc == -1 || flc == -2)
+         {
+            free(directoryComponents);
+            return flc;
+         }
+   }
+
+   free(directoryComponents);
+   return flc;
+}
+
+/*
+   Summary: Searches for the existance of a directory at the given path
+   Parameters:
+      targetPath     The absolute or relative path to the directory
+      flc            The first logical cluster of the current dir
+   Return:  the first logical cluster of the found directory
+            or -1 if the directory is not found
+*/
+char *getCurrentDirectory(char *previousDirectory, char *newPath)
+{
+   //if it's an absolute path, might as well start at the beginning
+   if(newPath[0] == '/')
+   {
+      previousDirectory = "/";
+   }
+
+   char **newComponents;
+   int newCount = split(newPath, &newComponents, "/\n");
+
+   char **oldComponents;
+   int oldCount = split(previousDirectory, &oldComponents, "/\n");
+
+   char **compiledComponents = malloc((newCount + oldCount) * sizeof(char));
+
+   int i;
+   for(i = 0; i < oldCount; i++)
+   {
+      compiledComponents[i] = oldComponents[i];
+   }
+
+   int j;
+   for(j = 0; j < newCount; j++)
+   {
+      if(strcmp(newComponents[j], "..") == 0)
+      {
+         i--;
+      }
+      else
+      {
+         compiledComponents[i] = newComponents[j];
+      }
+   }
+
+   char *returnPath = malloc(MAX_INPUT_LENGTH * sizeof(char));
+   strcpy(returnPath, "/");
+
+   int k;
+   for(k = 0; k <= i; k++)
+   {
+      strcat(returnPath, compiledComponents[k]);
+      strcat(returnPath, "/");
+   }
+
+   return returnPath;
 }

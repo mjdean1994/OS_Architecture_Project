@@ -1,4 +1,4 @@
-all: shell pbs pfe pwd ls
+all: shell pbs pfe pwd ls cd
 
 shell: shell.c
 	gcc -o shell shell.c -I.
@@ -14,3 +14,6 @@ pwd: pwd.c
 
 ls: ls.c
 	gcc -o ls ls.c -I.
+
+cd: cd.c
+	gcc -o cd cd.c -I.
