@@ -57,7 +57,7 @@ int main(int argc, char **argv)
    	unsigned char *buffer;
    	buffer = malloc(BYTES_PER_SECTOR * sizeof(char));
 
-   	char *fat = readFAT12Table(1, 0, 11);
+   	char *fat = readFAT12Table(1);
 
    	int fatEntry;
 

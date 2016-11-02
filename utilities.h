@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 size_t MAX_INPUT_LENGTH = 256;
 int BYTES_PER_SECTOR = 512;
@@ -114,7 +115,7 @@ int write_sector(int sector_number, unsigned char* buffer)
  * Return: the value at the specified entry of the given FAT
  ****************************************************************************/
 
-unsigned int get_fat_entry(int fat_entry_number, unsigned char* fat) 
+int get_fat_entry(int fat_entry_number, unsigned char* fat) 
 {
    int offset;
    int uv, wx, yz;
@@ -251,7 +252,7 @@ int searchForEntryInCurrentDirectory(char *targetName, int currentLogicalCluster
    unsigned char *buffer;
    buffer = malloc(BYTES_PER_SECTOR * sizeof(char));
 
-   char *fat = readFAT12Table(1, 0, 11);
+   char *fat = readFAT12Table(1);
 
    int fatEntry;
 

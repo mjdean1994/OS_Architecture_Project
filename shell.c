@@ -14,11 +14,11 @@ int forkAndExec(char **argv, int count);
 extern pid_t waitpid(pid_t pid , int *status, int options); 
 
 
-extern int read_sector(int sector_number, char* buffer);
-extern int write_sector(int sector_number, char* buffer);
+extern int read_sector(int sector_number, unsigned char* buffer);
+extern int write_sector(int sector_number, unsigned char* buffer);
 
-extern int  get_fat_entry(int fat_entry_number, char* fat);
-extern void set_fat_entry(int fat_entry_number, int value, char* fat);
+extern int  get_fat_entry(int fat_entry_number, unsigned char* fat);
+extern void set_fat_entry(int fat_entry_number, int value, unsigned char* fat);
 
 int main()
 {

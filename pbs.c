@@ -1,14 +1,14 @@
 #include "bootInfo.h"
-#include "fatSupport.h"
+#include "utilities.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include "sharedMemory.h"
 
 FILE* FILE_SYSTEM_ID;
-int BYTES_PER_SECTOR = 512;
 
 struct bootInfo BOOT_SECTOR;
 
+extern int read_sector(int sector_number, unsigned char* buffer);
 void readBootSector(unsigned char* boot);
 void printBootSector();
 
