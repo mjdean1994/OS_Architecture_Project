@@ -492,14 +492,6 @@ int new_searchForDirectory(char *targetPath, int flc)
    return flc;
 }
 
-/*
-   Summary: Searches for the existance of a directory at the given path
-   Parameters:
-      targetPath     The absolute or relative path to the directory
-      flc            The first logical cluster of the current dir
-   Return:  the first logical cluster of the found directory
-            or -1 if the directory is not found
-*/
 char *getCurrentDirectory(char *previousDirectory, char *newPath)
 {
    //if it's an absolute path, might as well start at the beginning
