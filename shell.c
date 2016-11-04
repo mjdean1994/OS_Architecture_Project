@@ -20,15 +20,29 @@ extern int write_sector(int sector_number, unsigned char* buffer);
 extern int  get_fat_entry(int fat_entry_number, unsigned char* fat);
 extern void set_fat_entry(int fat_entry_number, int value, unsigned char* fat);
 
-int main()
+int main(int argc, char **argv)
 {
 	char* boot;            // example buffer
 	int mostSignificantBits;
 	int leastSignificantBits;
 	int bytesPerSector;
 
+	//Inspired by https://beej.us/guide/bgipc/output/html/multipage/shm.html
+ 	int shmId = shmget((key_t) 8675308, sizeof(char), 0666 | IPC_CREAT);
+ 	SharedMemory *sharedMemory = (SharedMemory *)shmat(shmId, (void *) 0, 0);
+	
+	if((argc == 1))
+   	{
+		printf("No floppy image name supplied \n");
+		printf("Usage: ./shell floppy1 \n");
+		return -1;
+	}
+	strcpy(sharedMemory->floppyImageName, argv[1]);
+
 	// Use this for an image of a floppy drive
-	FILE_SYSTEM_ID = fopen(FLOPPY_IMAGE_NAME, "r+");
+	FILE_SYSTEM_ID = fopen(argv[1], "r+");
+	
+
 
 	if (FILE_SYSTEM_ID == NULL)
 	{
@@ -48,15 +62,10 @@ int main()
 		printf("Something has gone wrong -- could not read the boot sector\n");
 		return -1;
 	}
-
-	// 12 (not 11) because little endian
-	mostSignificantBits  = ( ( (int) boot[12] ) << 8 ) & 0x0000ff00;
-	leastSignificantBits =   ( (int) boot[11] )        & 0x000000ff;
-	bytesPerSector = mostSignificantBits | leastSignificantBits;
 	
 	int code = runShell();
 
- 	return 0; 
+ 	return code; 
 }
 
 
@@ -78,7 +87,6 @@ int runShell()
  	SharedMemory *sharedMemory = (SharedMemory *)shmat(shmId, (void *) 0, 0);
  
  	strcpy(sharedMemory->currentDirectory, "/");
- 	strcpy(sharedMemory->floppyImageName, FLOPPY_IMAGE_NAME);
  	sharedMemory->firstLogicalCluster = 0;
 
 	do
@@ -100,15 +108,18 @@ int runShell()
 		}*/
 		// END DEBUG*/
 
-
-		//strcmp(argv[0], "pbs") == 0
+		if(strcmp(argv[0], "exit") == 0)
+		{
+			break;
+		}
+		//strcmp(argv[0], "pbs")
 		forkResult = forkAndExec(argv, argc);
 
 		// Free memory allocated to the initial input string
 		free(input);
 		free(argv);
 		
-	} while(argc != 0 && strcmp(argv[0], "exit"));
+	} while(argc != 0);
 
 	shmctl(shmId, IPC_RMID, NULL);
 
