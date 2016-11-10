@@ -492,6 +492,52 @@ int new_searchForDirectory(char *targetPath, int flc)
    return flc;
 }
 
+/*
+   Summary: Searches for the directory in which a specified file is located
+   Parameters:
+      targetPath     The absolute or relative path to the file
+      flc            The first logical cluster of the current dir
+   Return:  the first logical cluster of the found directory
+            or -1 if the directory is not found
+            or -2 if the specified path points to a file
+*/
+int searchForFileDirectory(char *targetPath, int flc)
+{
+   if(targetPath[0] == '/')
+   {
+      flc = 0;
+   }
+
+   if(strcmp(targetPath, "/") == 0)
+   {
+      return 0;
+   }
+
+   char **directoryComponents = malloc(MAX_INPUT_LENGTH * sizeof(char));
+
+   int depth = split(targetPath, &directoryComponents, "/\n");
+
+   int i;
+
+   // if the directory does exist, this loop will execute exactly
+   // enough times to get us there
+   // depth - 1 will get us one layer up from the 
+   // specified directory, theoretically
+   for(i = 0; i < depth - 1; i++)
+   {
+         flc = new_searchDirectoryForSubdirectory(directoryComponents[i], flc);
+         // if we get an error, spit it back immediately.
+         if(flc == -1 || flc == -2)
+         {
+            free(directoryComponents);
+            return flc;
+         }
+   }
+
+   free(directoryComponents);
+   return flc;
+}
+
 char *getCurrentDirectory(char *previousDirectory, char *newPath)
 {
    //if it's an absolute path, might as well start at the beginning
@@ -538,4 +584,49 @@ char *getCurrentDirectory(char *previousDirectory, char *newPath)
    }
 
    return returnPath;
+}
+
+int countEntriesInFlc(int flc)
+{
+   unsigned char *fat = readFAT12Table(1);
+
+   unsigned char *clusterBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
+
+   int realCluster;
+   if(flc == 0)
+   {
+      realCluster = 19;
+   }
+   else
+   {
+      realCluster = 31 + flc;
+   }
+
+   int numBytes = read_sector(realCluster, clusterBytes);
+
+   int count = 0;
+   int j;
+
+   for(j = 0; j < 16; j++)
+      {
+         FileStructure file;
+         int entryOffset = j * 32;
+
+         file.filename = malloc(9 * sizeof(char));
+         int k;
+         // loop through each character of the filename
+         for(k = 0; k < 8 && clusterBytes[entryOffset + k] != ' ' && clusterBytes[entryOffset + k] != '\0'; k++)
+         {
+            file.filename[k] = clusterBytes[entryOffset + k];
+         }
+         file.filename[k] = '\0'; 
+         
+         if(clusterBytes[entryOffset] != 0x00 && clusterBytes[entryOffset] != 0xe5)
+         {
+            count = count + 1;
+         }
+
+      }
+
+   return count;
 }
