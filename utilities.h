@@ -751,6 +751,11 @@ int countEntriesInFlc(int flc)
             count = count + 1;
          }
 
+         if(clusterBytes[entryOffset] == 0x00)
+         {
+            return count;
+         }
+
       }
 
    return count;
