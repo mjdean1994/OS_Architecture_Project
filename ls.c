@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 	   		int offset = 0;
 	   		
 	   		file.filename = malloc(9 * sizeof(char));
-	   		for(i = 0; i < 8 && startOfEntry[offset + i] != ' ' && startOfEntry[offset + i] != '\0'; i++)
+	   		for(i = 0; i < 8 && startOfEntry[offset + i] != ' ' && startOfEntry[offset + i] != '\0' && startOfEntry[offset + i] != '\0'; i++)
 	   		{
 	   			file.filename[i] = startOfEntry[offset + i];
 	   		}
@@ -139,7 +139,15 @@ int main(int argc, char **argv)
 	   			}
 	   			else
 	   			{
-	   				printf("%-15s | FILE | %6d | %4d\n", strcat(strcat(file.filename, "."), file.extension), file.fileSize, file.flc);
+	   				if(file.extension[0] != ' ' && file.extension[0] != '\0')
+	   				{
+	   					printf("%-15s | FILE | %6d | %4d\n", strcat(strcat(file.filename, "."), file.extension), file.fileSize, file.flc);
+	   				}
+	   				else
+	   				{
+	   					printf("%-15s | FILE | %6d | %4d\n", file.filename, file.fileSize, file.flc);
+	   				}
+	   				
 	   			}
 	   			
 	   		}
