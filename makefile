@@ -1,4 +1,4 @@
-all: shell pbs pfe pwd ls cd rm rmdir
+all: shell pbs pfe pwd ls cd rm rmdir cat
 
 shell: shell.c
 	gcc -o shell shell.c -I.
@@ -23,3 +23,6 @@ rm: rm.c
 
 rmdir: rmdir.c
 	gcc -o rmdir rmdir.c -I.
+
+cat: cat.c
+	gcc -o cat cat.c -I.
