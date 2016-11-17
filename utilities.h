@@ -766,7 +766,7 @@ int findFreeCluster()
    unsigned char *fat = readFAT12Table(1);
 
    int i;
-   for(i = 0; i < 9; i++)
+   for(i = 0; i < FAT_SECTORS_NUM * BYTES_PER_SECTOR; i++)
    {
       int entry = get_fat_entry(i, fat);
       if(entry == 0x00)
@@ -784,7 +784,7 @@ int countFreeClusters()
 
    int count = 0;
    int i;
-   for(i = 0; i < 9; i++)
+   for(i = 0; i < FAT_SECTORS_NUM * BYTES_PER_SECTOR; i++)
    {
       int entry = get_fat_entry(i, fat);
       if(entry == 0x00)

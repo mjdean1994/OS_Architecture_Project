@@ -1,4 +1,4 @@
-all: shell pbs pfe pwd ls cd rm rmdir cat touch mkdir
+all: shell pbs pfe pwd ls cd rm rmdir cat touch mkdir df
 
 shell: shell.c
 	gcc -o shell shell.c -I.
@@ -32,3 +32,6 @@ touch: touch.c
 
 mkdir: mkdir.c
 	gcc -o mkdir mkdir.c -I.
+
+df: df.c
+	gcc -o df df.c -I.
