@@ -1,7 +1,8 @@
 all: clean copydisk shell pbs pfe pwd ls cd rm rmdir cat touch mkdir df
 
 clean:
-	rm build/*
+	mkdir -p build
+	rm -f build/*
 
 copydisk:
 	cp src/disk_images/* build/
