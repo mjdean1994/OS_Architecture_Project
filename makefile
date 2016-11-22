@@ -1,37 +1,43 @@
-all: shell pbs pfe pwd ls cd rm rmdir cat touch mkdir df
+all: clean copydisk shell pbs pfe pwd ls cd rm rmdir cat touch mkdir df
 
-shell: shell.c
-	gcc -o shell shell.c -I.
+clean:
+	rm build/*
 
-pbs: pbs.c
-	gcc -o pbs pbs.c -I.
+copydisk:
+	cp src/disk_images/* build/
 
-pfe: pfe.c
-	gcc -o pfe pfe.c -I.
+shell: src/shell.c
+	gcc -o build/shell src/shell.c
 
-pwd: pwd.c
-	gcc -o pwd pwd.c
+pbs: src/pbs.c
+	gcc -o build/pbs src/pbs.c
 
-ls: ls.c
-	gcc -o ls ls.c -I.
+pfe: src/pfe.c
+	gcc -o build/pfe src/pfe.c
 
-cd: cd.c
-	gcc -o cd cd.c -I.
+pwd: src/pwd.c
+	gcc -o build/pwd src/pwd.c
 
-rm: rm.c
-	gcc -o rm rm.c -I.
+ls: src/ls.c
+	gcc -o build/ls src/ls.c
 
-rmdir: rmdir.c
-	gcc -o rmdir rmdir.c -I.
+cd: src/cd.c
+	gcc -o build/cd src/cd.c
 
-cat: cat.c
-	gcc -o cat cat.c -I.
+rm: src/rm.c
+	gcc -o build/rm src/rm.c
 
-touch: touch.c
-	gcc -o touch touch.c -I.
+rmdir: src/rmdir.c
+	gcc -o build/rmdir src/rmdir.c
 
-mkdir: mkdir.c
-	gcc -o mkdir mkdir.c -I.
+cat: src/cat.c
+	gcc -o build/cat src/cat.c
 
-df: df.c
-	gcc -o df df.c -I.
+touch: src/touch.c
+	gcc -o build/touch src/touch.c
+
+mkdir: src/mkdir.c
+	gcc -o build/mkdir src/mkdir.c
+
+df: src/df.c
+	gcc -o build/df src/df.c
