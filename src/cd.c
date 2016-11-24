@@ -49,8 +49,6 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	printf("CDeez nutz\n");
-
 	char *newPath;
 	if(flc != 0)
 	{

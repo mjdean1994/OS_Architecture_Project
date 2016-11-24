@@ -296,6 +296,11 @@ int split(char *input, char ***argv, char *delimiter)
 
 int fileMatchesTarget(FileStructure file, char *targetName)
 {
+   if(strcmp("..", targetName) || strcmp(".", targetName))
+   {
+      return strcasecmp(file.filename, targetName);
+   }
+
    char **targetArgs;
    char *stringToSplit = malloc(BYTES_PER_SECTOR * sizeof(char));
    strcpy(stringToSplit, targetName);
