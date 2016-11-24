@@ -1,3 +1,20 @@
+/*
+   Authors: Matthew Dean, John Ryan
+   
+   Description:   This program is an implementation of the FAT12 file system, optimized for
+         execution on 64-bit Ubuntu 16.02 LTS
+
+   Certification of Authenticity:
+   As curators of this code, we certify that all code presented is our original intellectual property
+   or has been cited appropriately. 
+
+   Reservation of Intellectual Property Rights:
+   As curators of this code, we reserve all rights to this code (where not otherwise cited) as
+   intellectual property and do not release it for unreferenced redistribution. However, we do
+   allow and encourage inspiration to be drawn from this code and welcome use of our code with
+   proper citation.
+*/
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +47,7 @@ typedef struct _fileStructure
 
 extern FILE* FILE_SYSTEM_ID;
 extern int BYTES_PER_SECTOR;
+
 
 /******************************************************************************
  * read_sector
@@ -200,6 +218,40 @@ unsigned char* readFAT12Table(int fatIndex)
    return fat;   
 }
 
+FileStructure getFileAtEntry(char *entry)
+{
+   FileStructure file;
+
+   int i;
+   int offset = 0;
+
+   file.filename = malloc(9 * sizeof(char));
+   for(i = 0; i < 8 && entry[i] != ' ' && entry[i] != '\0'; i++)
+   {
+      file.filename[i] = entry[offset + i];
+   }
+   file.filename[i] = '\0';
+
+   file.extension = malloc(4 * sizeof(char));
+   for(i = 0; i < 3 && entry[8 + i] != ' ' && entry[8 + i] != '\0'; i++)
+   {
+      file.extension[i] = entry[8 + i];
+   }
+   file.extension[i] = '\0';
+
+   file.attributes = entry[11];
+
+   file.flc = ((((int) entry[27]) << 8 ) & 0x0000ff00)
+   | (((int) entry[26]) & 0x000000ff);
+
+   file.fileSize = ((((int) entry[31]) << 24 ) & 0xff000000)
+         | ((((int) entry[30]) << 16 ) & 0x00ff0000)
+         | ((((int) entry[29]) << 8 ) & 0x0000ff00)
+         | (((int) entry[28]) & 0x000000ff);  
+
+   return file;
+}
+
 /*
 	Summary:	Spilts the given input string where ' ' is the delimiting
 				character.
@@ -212,8 +264,9 @@ int split(char *input, char ***argv, char *delimiter)
 {
 	int count = 0;
 
-	char *freshInput = malloc(MAX_INPUT_LENGTH * sizeof(char));
-	freshInput = strdup(input);
+	char *freshInput = malloc(MAX_INPUT_LENGTH * sizeof(char*));
+	
+   strcpy(freshInput, input);
 
 	char *token;
 
@@ -238,8 +291,36 @@ int split(char *input, char ***argv, char *delimiter)
 		i++;
 	}
 
-	free(freshInput);
 	return count;
+}
+
+int fileMatchesTarget(FileStructure file, char *targetName)
+{
+   char **targetArgs;
+   char *stringToSplit = malloc(BYTES_PER_SECTOR * sizeof(char));
+   strcpy(stringToSplit, targetName);
+   int count = split(stringToSplit, &targetArgs, ".\n");
+
+   if(count == 1)
+   {
+      //if no extension, we need to make sure the file has no extension.
+      if(file.extension[0] != ' ' && file.extension[0] != '\0')
+      {
+         return 1;
+      }
+
+      return strcasecmp(file.filename, targetArgs[0]);
+   }
+
+   if(strcasecmp(file.filename, targetArgs[0]) == 0)
+   {
+      if(strcasecmp(file.extension, targetArgs[1]) == 0)
+      {
+         return 0;
+      }
+   } 
+
+   return 1;
 }
 
 int searchForEntryInCurrentDirectory(char *targetName, int currentLogicalCluster)
@@ -316,7 +397,7 @@ int searchForEntryInCurrentDirectory(char *targetName, int currentLogicalCluster
          file.flc = ((((int) startOfEntry[offset + 1]) << 8 ) & 0x0000ff00)
          | (((int) startOfEntry[offset + 0]) & 0x000000ff);
 
-         if(strcmp(file.filename, targetName) == 0)
+         if(strcasecmp(file.filename, targetName) == 0)
          {
             if((file.attributes & 0x10) == 0x10)
             {
@@ -341,7 +422,7 @@ int searchForEntryInCurrentDirectory(char *targetName, int currentLogicalCluster
 int searchForDirectory(char *directoryPath, int currentLogicalCluster)
 {
 	//If home directory
-	if(strcmp(directoryPath, "/") == 0)
+	if(strcasecmp(directoryPath, "/") == 0)
 	{
 		return 0;
 	}
@@ -412,28 +493,15 @@ int new_searchDirectoryForSubdirectory(char *targetName, int flc)
       {
          FileStructure file;
          int entryOffset = j * 32;
+         file = getFileAtEntry(clusterBytes + entryOffset);
 
-         file.filename = malloc(9 * sizeof(char));
-         int k;
-         // loop through each character of the filename
-         for(k = 0; k < 8 && clusterBytes[entryOffset + k] != ' ' && clusterBytes[entryOffset + k] != '\0'; k++)
+         if(fileMatchesTarget(file, targetName) == 0)
          {
-            file.filename[k] = clusterBytes[entryOffset + k];
-         }
-         file.filename[k] = '\0'; 
-
-         if(strcmp(file.filename, targetName) == 0)
-         {
-            file.attributes = clusterBytes[entryOffset + 11];
-            // if it isn't a directory (aka a file), return -2
             if((file.attributes & 0x10) != 0x10)
             {
                return -2;
             }
 
-            file.flc = ((((int) clusterBytes[entryOffset + 27]) << 8 ) & 0x0000ff00)
-            | (((int) clusterBytes[entryOffset + 26]) & 0x000000ff);
-            free(file.filename);
             return file.flc;
          }
 
@@ -464,7 +532,7 @@ int new_searchForDirectory(char *targetPath, int flc)
       flc = 0;
    }
 
-   if(strcmp(targetPath, "/") == 0)
+   if(strcasecmp(targetPath, "/") == 0)
    {
       return 0;
    }
@@ -529,28 +597,15 @@ int searchDirectoryForFile(char *targetName, int flc)
       {
          FileStructure file;
          int entryOffset = j * 32;
+         file = getFileAtEntry(clusterBytes + entryOffset);
 
-         file.filename = malloc(9 * sizeof(char));
-         int k;
-         // loop through each character of the filename
-         for(k = 0; k < 8 && clusterBytes[entryOffset + k] != ' ' && clusterBytes[entryOffset + k] != '\0'; k++)
+         if(fileMatchesTarget(file, targetName) == 0)
          {
-            file.filename[k] = clusterBytes[entryOffset + k];
-         }
-         file.filename[k] = '\0'; 
-
-         if(strcmp(file.filename, targetName) == 0)
-         {
-            file.attributes = clusterBytes[entryOffset + 11];
             // if it is a directory, not a file, return -2
             if((file.attributes & 0x10) == 0x10)
             {
                return -2;
             }
-
-            file.flc = ((((int) clusterBytes[entryOffset + 27]) << 8 ) & 0x0000ff00)
-            | (((int) clusterBytes[entryOffset + 26]) & 0x000000ff);
-            free(file.filename);
             return file.flc;
          }
 
@@ -581,7 +636,7 @@ int searchForFile(char *targetPath, int flc)
       flc = 0;
    }
 
-   if(strcmp(targetPath, "/") == 0)
+   if(strcasecmp(targetPath, "/") == 0)
    {
       return 0;
    }
@@ -633,7 +688,7 @@ int searchForFileDirectory(char *targetPath, int flc)
       flc = 0;
    }
 
-   if(strcmp(targetPath, "/") == 0)
+   if(strcasecmp(targetPath, "/") == 0)
    {
       return 0;
    }
@@ -688,7 +743,7 @@ char *getCurrentDirectory(char *previousDirectory, char *newPath)
    int j;
    for(j = 0; j < newCount; j++)
    {
-      if(strcmp(newComponents[j], "..") == 0)
+      if(strcasecmp(newComponents[j], "..") == 0)
       {
          i--;
       }
