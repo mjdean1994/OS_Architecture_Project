@@ -10,13 +10,11 @@ FILE* FILE_SYSTEM_ID;
 
 int runShell();
 int forkAndExec(char **argv, int count);
+int isValidCommand(char *arg);
 
 extern pid_t waitpid(pid_t pid , int *status, int options); 
-
-
 extern int read_sector(int sector_number, unsigned char* buffer);
 extern int write_sector(int sector_number, unsigned char* buffer);
-
 extern int  get_fat_entry(int fat_entry_number, unsigned char* fat);
 extern void set_fat_entry(int fat_entry_number, int value, unsigned char* fat);
 
@@ -68,7 +66,6 @@ int main(int argc, char **argv)
  	return code; 
 }
 
-
 /*
 	Summary:	Executes the functionality to run the shell, looping until
 				the user opts to exit
@@ -98,21 +95,15 @@ int runShell()
 		getline(&input, &MAX_INPUT_LENGTH, stdin);
 		argc = split(input, &argv, " \n");
 
-		// START DEBUG
-		/*printf("argc=[%d]\n", argc);
-
-		int iterator;
-		for(iterator = 0; iterator < argc; iterator++)
-		{
-			printf("arg[%d]=[%s]\n", iterator, argv[iterator]);
-		}*/
-		// END DEBUG*/
-
 		if(strcmp(argv[0], "exit") == 0)
 		{
 			break;
 		}
-		//strcmp(argv[0], "pbs")
+		if(isValidCommand(argv[0]) == 0)
+		{
+			printf("ERROR: Unknown command.\n");
+			exit(1);
+		}
 		forkResult = forkAndExec(argv, argc);
 
 		// Free memory allocated to the initial input string
@@ -125,6 +116,7 @@ int runShell()
 
 	return 0;
 }
+
 /*
 	Summary:	Creates a fork and runs child process with exec.
 	Parameters:
@@ -169,8 +161,68 @@ int forkAndExec(char **argv, int count)
 		{
 			//invalid input, (max 2 additional arguments)
 			//check and quit here or in main?
-			printf("Too many var\n");
+			printf("ERROR: Too many variables.\n");
 		}
 	}
 	return status;
+}
+
+/*
+	Summary:	Validates the user-input command 
+	Parameters:
+		arg 	The string to validate
+	Return:		1 if the command exists, or 0 if it does not
+*/
+int isValidCommand(char *arg)
+{
+	if(strcmp(arg, "pbs") == 0)
+	{
+		return 1;
+	}
+	if(strcmp(arg, "pfe") == 0)
+	{
+		return 1;
+	}
+	if(strcmp(arg, "ls") == 0)
+	{
+		return 1;
+	}
+	if(strcmp(arg, "cd") == 0)
+	{
+		return 1;
+	}
+	if(strcmp(arg, "rm") == 0)
+	{
+		return 1;
+	}
+	if(strcmp(arg, "rmdir") == 0)
+	{
+		return 1;
+	}
+	if(strcmp(arg, "touch") == 0)
+	{
+		return 1;
+	}
+	if(strcmp(arg, "mkdir") == 0)
+	{
+		return 1;
+	}
+	if(strcmp(arg, "df") == 0)
+	{
+		return 1;
+	}
+	if(strcmp(arg, "pwd") == 0)
+	{
+		return 1;
+	}
+	if(strcmp(arg, "cat") == 0)
+	{
+		return 1;
+	}
+	if(strcmp(arg, "exit") == 0)
+	{
+		return 1;
+	}
+
+	return 0;
 }
