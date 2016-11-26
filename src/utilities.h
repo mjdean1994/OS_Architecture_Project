@@ -296,7 +296,7 @@ int split(char *input, char ***argv, char *delimiter)
 
 int fileMatchesTarget(FileStructure file, char *targetName)
 {
-   if(strcmp("..", targetName) || strcmp(".", targetName))
+   if(strcmp("..", targetName) == 0 || strcmp(".", targetName) == 0)
    {
       return strcasecmp(file.filename, targetName);
    }
@@ -305,7 +305,6 @@ int fileMatchesTarget(FileStructure file, char *targetName)
    char *stringToSplit = malloc(BYTES_PER_SECTOR * sizeof(char));
    strcpy(stringToSplit, targetName);
    int count = split(stringToSplit, &targetArgs, ".\n");
-
    if(count == 1)
    {
       //if no extension, we need to make sure the file has no extension.

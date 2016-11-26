@@ -9,12 +9,12 @@ int main(int argc, char **argv)
 {
 	if(argc > 2)
 	{
-		printf("Too many arguments! Usage: rm {path}");
+		printf("Too many arguments! Usage: rm {path}\n");
 		exit(1);
 	}
 	if(argc == 1)
 	{
-		printf("Too few argume nts! Usage: rm {path}");
+		printf("Too few arguments! Usage: rm {path}\n");
 		exit(1);
 	}
 
@@ -26,12 +26,15 @@ int main(int argc, char **argv)
 	FILE_SYSTEM_ID = fopen(sharedMemory->floppyImageName, "r+");
 
 	if (FILE_SYSTEM_ID == NULL)
-   	{
-      		printf("Could not open the floppy drive or image.\n");
-      		exit(1);
-   	}
+	{
+   		printf("Could not open the floppy drive or image.\n");
+   		exit(1);
+	}
 
-   	int flc = searchForFileDirectory(argv[1], sharedMemory->firstLogicalCluster);
+   char *cleanPath = malloc(MAX_INPUT_LENGTH * sizeof(char));
+   strcpy(cleanPath, argv[1]);
+
+	int flc = searchForFileDirectory(argv[1], sharedMemory->firstLogicalCluster);
 
 	if(flc == -2)
 	{
@@ -49,7 +52,7 @@ int main(int argc, char **argv)
    
    //last name in path should be the file name
 	char **directoryComponents = malloc(MAX_INPUT_LENGTH * sizeof(char));
-   	int depth = split(argv[1], &directoryComponents, "/\n");
+   	int depth = split(cleanPath, &directoryComponents, "/\n");
 	char *targetName = directoryComponents[depth - 1];
 
    int nextCluster;
@@ -78,33 +81,23 @@ int main(int argc, char **argv)
       {
          FileStructure file;
          int entryOffset = j * 32;
+         file = getFileAtEntry(clusterBytes + entryOffset);
 
-         file.filename = malloc(9 * sizeof(char));
-         int k;
-         // loop through each character of the filename
-         for(k = 0; k < 8 && clusterBytes[entryOffset + k] != ' ' && clusterBytes[entryOffset + k] != '\0'; k++)
+         if(fileMatchesTarget(file, targetName) == 0)
          {
-            file.filename[k] = clusterBytes[entryOffset + k];
-         }
-         file.filename[k] = '\0'; 
-
-         if(strcmp(file.filename, targetName) == 0)
-         {
-            file.attributes = clusterBytes[entryOffset + 11];
             // if it is a directory (aka not a file), return -2
             if((file.attributes & 0x10) == 0x10)
             {
             	printf("Path refers to a directory, not a file.\n");
                exit(1);
             }
-
-            clusterBytes[entryOffset] = 0xe5;
+            clusterBytes[entryOffset] = 0xE5;
             write_sector(realCluster, clusterBytes);
 
             char *tmp = malloc(BYTES_PER_SECTOR * sizeof(char));
             tmp = readFAT12Table(1);
-            get_fat_entry(file.flc, tmp);
             set_fat_entry(file.flc, 0x00, tmp);
+            saveFAT12Table(1, tmp);
 
             return 0;
          }
