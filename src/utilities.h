@@ -328,139 +328,6 @@ int fileMatchesTarget(FileStructure file, char *targetName)
    return 1;
 }
 
-int searchForEntryInCurrentDirectory(char *targetName, int currentLogicalCluster)
-{
-   int flc = currentLogicalCluster;
-
-   // as outlined in spec.
-   int realCluster;
-
-   unsigned char *buffer;
-   buffer = malloc(BYTES_PER_SECTOR * sizeof(char));
-
-   unsigned char *fat = readFAT12Table(1);
-
-   int fatEntry;
-
-   do
-      {
-         if(flc == 0)
-      {
-         realCluster = 19;
-      }
-      else
-      {
-         realCluster = 31 + flc;
-      }
-
-      fatEntry = get_fat_entry(flc, fat);
-
-      //foreach cluster in current dir
-      int clusterBytes = read_sector(realCluster, buffer);
-
-      //for each entry in cluster
-      int entryIndex;
-
-      for(entryIndex = 0; entryIndex < 16; entryIndex++)
-      {
-         FileStructure file;
-
-         unsigned char *startOfEntry = buffer + (32 * entryIndex);
-         if(startOfEntry[0] == 0x00)
-         {
-            //if it's zero, there's nothing else in the directory
-            break;
-         }
-         //I realize this line doesn't make any sense. Refactor needed.
-         if(startOfEntry[0] == 0xE5 || startOfEntry[0] == 0xffffffe5)
-         {
-            //if it's E5, this is empty. Ignore it.
-            continue;
-         }
-
-         int i;
-         int offset = 0;
-
-         file.filename = malloc(9 * sizeof(char));
-         for(i = 0; i < 8 && startOfEntry[offset + i] != ' ' && startOfEntry[offset + i] != '\0'; i++)
-         {
-            file.filename[i] = startOfEntry[offset + i];
-         }
-         file.filename[i] = '\0';
-
-         file.extension = malloc(4 * sizeof(char));
-         offset = 8;
-         for(i = 0; i < 3 && startOfEntry[offset + i] != '\0'; i++)
-         {
-            file.extension[i] = startOfEntry[offset + i];
-         }
-         file.extension[i] = '\0';
-
-         file.attributes = startOfEntry[11];
-
-         offset = 26;
-         file.flc = ((((int) startOfEntry[offset + 1]) << 8 ) & 0x0000ff00)
-         | (((int) startOfEntry[offset + 0]) & 0x000000ff);
-
-         if(strcasecmp(file.filename, targetName) == 0)
-         {
-            if((file.attributes & 0x10) == 0x10)
-            {
-               return file.flc;
-            }
-            else
-            {
-               printf("%-15s | %-4s | %-6s | %-4s", "NAME", "TYPE", "SIZE", "FLC\n");
-               printf("----------------|------|--------|-----\n");
-               printf("%-15s | FILE | %6d | %4d\n", strcat(strcat(file.filename, "."), file.extension), file.fileSize, file.flc);
-               return -2;
-            }
-         }
-      }
-
-      flc = fatEntry;
-   }while(fatEntry > 0x00 && fatEntry < 0xFF0);
-
-   return -1;
-}
-
-int searchForDirectory(char *directoryPath, int currentLogicalCluster)
-{
-	//If home directory
-	if(strcasecmp(directoryPath, "/") == 0)
-	{
-		return 0;
-	}
-
-	//directory name can't start with a slash
-	if(directoryPath[0] == '/')
-	{
-		return -1;
-	}
-
-	char **pathComponents;
-
-	int depth = split(directoryPath, &pathComponents, "/\n");
-   printf("%d\n", depth);
-   //if that directory exists, we need to loop this many times
-   int i;
-   for(i = 0; i < depth; i++)
-   {
-      int cluster = searchForEntryInCurrentDirectory(pathComponents[i], currentLogicalCluster);
-      if(currentLogicalCluster == -1)
-      {
-         return -1;
-      }
-      if(cluster == -2)
-      {
-         return -2;
-      }
-      currentLogicalCluster = cluster;
-   }
-
-	return currentLogicalCluster;
-}
-
 /*
    Summary: Searches for the existance of a directory within a given directory
       targetName     the name of the directory to find
@@ -469,7 +336,7 @@ int searchForDirectory(char *directoryPath, int currentLogicalCluster)
             or -1 if the directory is not found
             or -2 if the specified path points to a file
 */
-int new_searchDirectoryForSubdirectory(char *targetName, int flc)
+int searchDirectoryForSubdirectory(char *targetName, int flc)
 {
    unsigned char *fat = readFAT12Table(1);
    int nextCluster;
@@ -530,7 +397,7 @@ int new_searchDirectoryForSubdirectory(char *targetName, int flc)
             or -1 if the directory is not found
             or -2 if the specified path points to a file
 */
-int new_searchForDirectory(char *targetPath, int flc)
+int searchForDirectory(char *targetPath, int flc)
 {
    if(targetPath[0] == '/')
    {
@@ -552,7 +419,7 @@ int new_searchForDirectory(char *targetPath, int flc)
    // enough times to get us there
    for(i = 0; i < depth; i++)
    {
-         flc = new_searchDirectoryForSubdirectory(directoryComponents[i], flc);
+         flc = searchDirectoryForSubdirectory(directoryComponents[i], flc);
          // if we get an error, spit it back immediately.
          if(flc == -1 || flc == -2)
          {
@@ -662,7 +529,7 @@ int searchForFile(char *targetPath, int flc)
          }
          else
          {
-            flc = new_searchDirectoryForSubdirectory(directoryComponents[i], flc);
+            flc = searchDirectoryForSubdirectory(directoryComponents[i], flc);
          }
          
          // if we get an error, spit it back immediately.
@@ -710,7 +577,7 @@ int searchForFileDirectory(char *targetPath, int flc)
    // specified directory, theoretically
    for(i = 0; i < depth - 1; i++)
    {
-         flc = new_searchDirectoryForSubdirectory(directoryComponents[i], flc);
+         flc = searchDirectoryForSubdirectory(directoryComponents[i], flc);
          // if we get an error, spit it back immediately.
          if(flc == -1 || flc == -2)
          {
@@ -854,4 +721,14 @@ int countFreeClusters()
    }
 
    return count;
+}
+
+void saveFAT12Table(int table, unsigned char *fat)
+{
+   int i;
+
+   for(i = 0; i < FAT_SECTORS_NUM; i++)
+   {
+      write_sector(i + 1, fat + (i * BYTES_PER_SECTOR));
+   }
 }

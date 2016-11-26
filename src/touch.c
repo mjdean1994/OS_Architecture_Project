@@ -41,12 +41,12 @@ int main(int argc, char **argv)
 {
 	if(argc > 2)
 	{
-		printf("Too many arguments! Usage: rm {path}");
+		printf("ERROR: Too many arguments. Usage: touch {path}\n");
 		exit(1);
 	}
 	if(argc == 1)
 	{
-		printf("Too few argume nts! Usage: rm {path}");
+		printf("ERROR: Too few arguments. Usage: touch {path}\n");
 		exit(1);
 	}
 
@@ -57,40 +57,50 @@ int main(int argc, char **argv)
  
 	FILE_SYSTEM_ID = fopen(sharedMemory->floppyImageName, "r+");
 
-	if (FILE_SYSTEM_ID == NULL)
-   	{
-      		printf("Could not open the floppy drive or image.\n");
-      		exit(1);
-   	}
 
-   	int flc = searchForFileDirectory(argv[1], sharedMemory->firstLogicalCluster);
+	if (FILE_SYSTEM_ID == NULL)
+   {
+      		printf("ERROR: Could not open the floppy drive or image.\n");
+      		exit(1);
+   }
+
+
+   char *cleanPath = malloc(MAX_INPUT_LENGTH * sizeof(char));
+   char *splitPath = malloc(MAX_INPUT_LENGTH * sizeof(char));
+   strcpy(cleanPath, argv[1]);
+   strcpy(splitPath, argv[1]);
+   int flc = searchForFile(argv[1], sharedMemory->firstLogicalCluster);
+   if(flc > 0 || flc == -2)
+   {
+      printf("ERROR: File or directory already exists.\n");
+      exit(1);
+   }
+
+   flc = searchForFileDirectory(cleanPath, sharedMemory->firstLogicalCluster);
 
 	if(flc == -2)
 	{
-		printf("Specified path leads to a directory, not a file.\n");
+		printf("ERROR: Specified path leads to a directory, not a file.\n");
 		exit(1);
 	}
 
 	if(flc < 0)
 	{
-		printf("File or directory not found.\n");
+		printf("ERROR: File or directory not found.\n");
 		exit(1);
 	}
 
 	unsigned char *fat = readFAT12Table(1);
-   
    //last name in path should be the file name
 	char **directoryComponents = malloc(MAX_INPUT_LENGTH * sizeof(char));
-   	int depth = split(argv[1], &directoryComponents, "/\n");
+   int depth = split(splitPath, &directoryComponents, "/\n");
 	char *targetName = directoryComponents[depth - 1];
-
    int nextCluster;
    // Loop through all clusters...
    do
    {
       nextCluster = get_fat_entry(flc, fat);
       unsigned char *clusterBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
-
       int realCluster;
       if(flc == 0)
       {
@@ -113,10 +123,9 @@ int main(int argc, char **argv)
          if(clusterBytes[entryOffset] == 0xe5 || clusterBytes[entryOffset] == 0x00)
          {
          	int cluster = findFreeCluster();
-
          	if(cluster < 0)
          	{
-         		printf("The file system is full. Cannot touch.\n");
+         		printf("ERROR: The file system is full. Cannot touch.\n");
          	}
 
          	int i = 0;
@@ -124,7 +133,7 @@ int main(int argc, char **argv)
          	//set the name
          		if(targetName[0] == '.')
          		{
-         			printf("File name cannot start with '.'\n");
+         			printf("ERROR: File name cannot start with '.'\n");
          			exit(1);
          		}
          		char **parts;
@@ -179,6 +188,10 @@ int main(int argc, char **argv)
          	}
 
          	write_sector(realCluster, clusterBytes);
+            set_fat_entry(cluster, 0xFFF, fat);
+            saveFAT12Table(1, fat);
+            free(directoryComponents);
+            free(clusterBytes);
          	return 0;
          }
 
@@ -194,7 +207,7 @@ int main(int argc, char **argv)
 
       	if(newCluster < 0)
       	{
-      		printf("Could not expand directory--file system is full.\n");
+      		printf("ERROR: Could not expand directory--file system is full.\n");
       		exit(1);
       	}
 
@@ -202,6 +215,8 @@ int main(int argc, char **argv)
       	flc = nextCluster;
       }
    } while (nextCluster > 0x00 && nextCluster < 0xFF0);
+
+
 
    	//if we get here, we need to try to make a new cluster. 
 	//If we can't make a new cluster, print out that we can't

@@ -54,7 +54,7 @@ int main(int argc, char **argv)
    	}
    	else
    	{
-   		flc = new_searchForDirectory(argv[1], sharedMemory->firstLogicalCluster);
+   		flc = searchForDirectory(argv[1], sharedMemory->firstLogicalCluster);
 
    		if(flc == -2)
 	   	{
