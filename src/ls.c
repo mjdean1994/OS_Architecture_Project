@@ -26,7 +26,7 @@ int main(int argc, char **argv)
 {
 	if(argc > 2)
 	{
-		printf("ERROR: Too many arguments. Usage: ls <or> ls x");
+		printf("ERROR: Too many arguments. Usage: ls <or> ls x\n");
 		exit(1);
 	}
 
