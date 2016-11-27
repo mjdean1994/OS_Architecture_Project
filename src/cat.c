@@ -25,12 +25,12 @@ int main(int argc, char **argv)
 {
 	if(argc > 2)
 	{
-		printf("Too many arguments! Usage: rm {path}\n");
+		printf("Too many arguments! Usage: cat {file}\n");
 		exit(1);
 	}
 	if(argc == 1)
 	{
-		printf("Too few arguments! Usage: rm {path}\n");
+		printf("Too few arguments! Usage: cat {file}\n");
 		exit(1);
 	}
 

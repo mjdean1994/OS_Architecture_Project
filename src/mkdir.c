@@ -25,12 +25,12 @@ int main(int argc, char **argv)
 {
 	if(argc > 2)
 	{
-		printf("Too many arguments! Usage: rm {path}");
+		printf("Too many arguments! Usage: mkdir {directoryName}\n");
 		exit(1);
 	}
 	if(argc == 1)
 	{
-		printf("Too few argume nts! Usage: rm {path}");
+		printf("Too few argume nts! Usage: mkdir {directoryName}\n");
 		exit(1);
 	}
 
