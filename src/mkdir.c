@@ -125,8 +125,8 @@ int main(int argc, char **argv)
       		
 
          		clusterBytes[entryOffset + 11] = 0x10;
-         		clusterBytes[entryOffset + 26] = cluster;
-               clusterBytes[entryOffset + 27] = 0;
+         		clusterBytes[entryOffset + 26] = cluster & 0x00ff;
+               clusterBytes[entryOffset + 27] = (cluster & 0xff00) >> 16;
          		clusterBytes[entryOffset + 28] = 0;
          		clusterBytes[entryOffset + 29] = 0;
          		clusterBytes[entryOffset + 30] = 0;
@@ -148,7 +148,7 @@ int main(int argc, char **argv)
             clusterBytes[1] = '\0';
             clusterBytes[11] = 0x10;
             clusterBytes[26] = cluster & 0x00ff;
-            clusterBytes[27] = cluster & 0xff00;
+            clusterBytes[27] = (cluster & 0xff00) >> 16;
             clusterBytes[28] = 0;
             clusterBytes[29] = 0;
             clusterBytes[30] = 0;
@@ -271,7 +271,7 @@ int main(int argc, char **argv)
 
    clusterBytes[11] = 0x10;
    clusterBytes[26] = cluster & 0x00ff;
-   clusterBytes[27] = cluster & 0xff00;
+   clusterBytes[27] = (cluster & 0xff00) >> 16;
    clusterBytes[28] = 0;
    clusterBytes[29] = 0;
    clusterBytes[30] = 0;
@@ -289,7 +289,7 @@ int main(int argc, char **argv)
    clusterBytes[1] = '\0';
    clusterBytes[11] = 0x10;
    clusterBytes[26] = cluster & 0x00ff;
-   clusterBytes[27] = cluster & 0xff00;
+   clusterBytes[27] = (cluster & 0xff00) >> 16;
    clusterBytes[28] = 0;
    clusterBytes[29] = 0;
    clusterBytes[30] = 0;

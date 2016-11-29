@@ -97,5 +97,6 @@ int main(int argc, char **argv)
       }
    } while(nextCluster > 0x00 && nextCluster < 0xFF0);
 
+   printf("\n");
    return 0;
 }
