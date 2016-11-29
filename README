@@ -1,3 +1,11 @@
 Run 'make' in the main project directory to build the project. You should then change your directory to the build directory and use ./shell {floppyFileName} to run the program, where floppyFileName is the name of the floppy image you'd like to load into the shell.
 
 The code authors reserve all rights to this code and do not authorize replication of code featured in this project without proper citation.
+
+
+Automated tests scripts stored in the 'Test Scripts' directory are executed using a third party application.
+If you wish to execute them, use the following steps.
+
+	-sudo apt-get install actionaz- 
+	Open the script in the application.
+	Click the 'gear' icon and click within a terminal window open from the build directory within 5 seconds.
