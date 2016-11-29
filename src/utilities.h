@@ -211,7 +211,7 @@ unsigned char* readFAT12Table(int fatIndex)
    int i;
 
    // 9 because there are 9 fat sectors
-   for(i = 0; i <= FAT_SECTORS_NUM; i++)
+   for(i = 0; i < FAT_SECTORS_NUM; i++)
    {
       read_sector(i + 1, &fat[i * BYTES_PER_SECTOR]);
    }
@@ -697,6 +697,7 @@ int findFreeCluster()
       int entry = get_fat_entry(i, fat);
       if(entry == 0x00)
       {
+         printf("Returning %d\n", i);
          return i;
       }
    }

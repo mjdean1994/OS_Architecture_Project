@@ -80,7 +80,8 @@ int main(int argc, char **argv)
          //if first byte is 0xE5 or 0x00, it's a free space
          if(clusterBytes[entryOffset] == 0xe5 || clusterBytes[entryOffset] == 0x00)
          {
-         	int cluster = findFreeCluster();
+            int oldStartByte = clusterBytes[entryOffset];
+         	long cluster = findFreeCluster();
 
          	if(cluster < 0)
          	{
@@ -100,7 +101,7 @@ int main(int argc, char **argv)
 	         	{
 	         		clusterBytes[entryOffset + i] = targetName[i];
 	         	}
-	         	if(i < 7)
+	         	if(i <= 7)
 	         	{
 	         		clusterBytes[entryOffset + i] = '\0';
 	         	}
@@ -109,16 +110,17 @@ int main(int argc, char **argv)
 
          		clusterBytes[entryOffset + 11] = 0x10;
          		clusterBytes[entryOffset + 26] = cluster;
+               clusterBytes[entryOffset + 27] = 0;
          		clusterBytes[entryOffset + 28] = 0;
          		clusterBytes[entryOffset + 29] = 0;
          		clusterBytes[entryOffset + 30] = 0;
          		clusterBytes[entryOffset + 31] = 0;
          	
 
-         	if(j != 15  && clusterBytes[entryOffset] == 0x00)
+         	if(j != 15  && oldStartByte == 0x00)
          	{
          		//if we replaced the last entry, we need to set the next entry to be the last entry
-         		clusterBytes[entryOffset + 32] == 0x00;
+         		clusterBytes[entryOffset + 32] = 0x00;
          	}
 
          	write_sector(realCluster, clusterBytes);
@@ -129,8 +131,8 @@ int main(int argc, char **argv)
             clusterBytes[0] = '.';
             clusterBytes[1] = '\0';
             clusterBytes[11] = 0x10;
-            clusterBytes[26] = cluster;
-            clusterBytes[27] = 0;
+            clusterBytes[26] = cluster & 0x00ff;
+            clusterBytes[27] = cluster & 0xff00;
             clusterBytes[28] = 0;
             clusterBytes[29] = 0;
             clusterBytes[30] = 0;
@@ -147,6 +149,10 @@ int main(int argc, char **argv)
             clusterBytes[63] = 0;
             clusterBytes[64] = 0x00;
             write_sector(realCluster, clusterBytes);
+            set_fat_entry(cluster, 0xFFF, fat);
+            saveFAT12Table(1, fat);
+            free(directoryComponents);
+            free(clusterBytes);
          	return 0;
          }
 
@@ -171,6 +177,120 @@ int main(int argc, char **argv)
       }
    } while (nextCluster > 0x00 && nextCluster < 0xFF0);
 
+   int newCluster = findFreeCluster();
+
+   if(newCluster < 0)
+   {
+      printf("ERROR: Unable to expand file system.\n");
+      exit(1);
+   }
+
+   set_fat_entry(flc, newCluster, fat);
+   set_fat_entry(newCluster, 0xFF0, fat);
+   saveFAT12Table(1, fat);
+
+   unsigned char *clusterBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
+   int realCluster;
+   if(flc == 0)
+   {
+      realCluster = 19;
+   }
+   else
+   {
+      realCluster = 31 + newCluster;
+   }
+   int numBytes = read_sector(realCluster, clusterBytes);
+
+   int i = 0;
+
+   //set the name
+   if(targetName[0] == '.')
+   {
+      printf("ERROR: File name cannot start with '.'\n");
+      exit(1);
+   }
+   char **parts;
+   int partCount = split(targetName, &parts, ".\\");
+   
+   if(partCount == 2)
+   {
+      char *fileName = parts[0];
+      for(i = 0; i < 8 && fileName[i] != '\0'; i++)
+      {
+         clusterBytes[i] = fileName[i];
+      }
+      if(i < 7)
+      {
+         clusterBytes[i] = '\0';
+      }
+      char *extension = parts[1];
+      for(i = 8; i < 11 || extension[i - 8] != '\0'; i++)
+      {
+         clusterBytes[i] = extension[i - 8];
+      }
+      if(i < 10)
+      {
+         clusterBytes[i] = '\0';
+      }
+   }
+   else
+   {
+      for(i = 0; i < 8 && targetName[i] != '\0'; i++)
+      {
+         clusterBytes[i] = targetName[i];
+      }
+      if(i <= 7)
+      {
+         clusterBytes[i] = '\0';
+      }
+      clusterBytes[8] = '\0';
+   }
+
+   long cluster = findFreeCluster();
+   if(cluster < 0)
+   {
+      printf("ERROR: Failed to expand file system.\n");
+      exit(1);
+   }
+
+   clusterBytes[11] = 0x10;
+   clusterBytes[26] = cluster & 0x00ff;
+   clusterBytes[27] = cluster & 0xff00;
+   clusterBytes[28] = 0;
+   clusterBytes[29] = 0;
+   clusterBytes[30] = 0;
+   clusterBytes[31] = 0;
+
+
+   //if we replaced the last entry, we need to set the next entry to be the last entry
+   clusterBytes[32] = 0;
+
+
+   write_sector(realCluster, clusterBytes);
+   numBytes = read_sector(realCluster, clusterBytes);
+
+   clusterBytes[0] = '.';
+   clusterBytes[1] = '\0';
+   clusterBytes[11] = 0x10;
+   clusterBytes[26] = cluster & 0x00ff;
+   clusterBytes[27] = cluster & 0xff00;
+   clusterBytes[28] = 0;
+   clusterBytes[29] = 0;
+   clusterBytes[30] = 0;
+   clusterBytes[31] = 0;
+   clusterBytes[32] = '.';
+   clusterBytes[33] = '.';
+   clusterBytes[34] = ' ';
+   clusterBytes[43] = 0x10;
+   clusterBytes[58] = flc;
+   clusterBytes[59] = 0;
+   clusterBytes[60] = 0;
+   clusterBytes[61] = 0;
+   clusterBytes[62] = 0;
+   clusterBytes[63] = 0;
+   clusterBytes[64] = 0x00;
+   set_fat_entry(cluster, 0xFFF, fat);
+   saveFAT12Table(1, fat);
    	//if we get here, we need to try to make a new cluster. 
 	//If we can't make a new cluster, print out that we can't
 }
