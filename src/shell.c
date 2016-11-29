@@ -15,17 +15,18 @@
 	proper citation.
 */
 
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "shell.h"
+#include "sharedMemory.h"
 #include "utilities.h"
 
 #define BYTES_TO_READ_IN_BOOT_SECTOR 512
 
 FILE* FILE_SYSTEM_ID;
 
+void printHeader();
 int runShell();
 int forkAndExec(char **argv, int count);
 int isValidCommand(char *arg);
@@ -38,6 +39,8 @@ extern void set_fat_entry(int fat_entry_number, int value, unsigned char* fat);
 
 int main(int argc, char **argv)
 {
+	printHeader();
+
 	char* boot;            // example buffer
 	int mostSignificantBits;
 	int leastSignificantBits;
@@ -246,4 +249,23 @@ int isValidCommand(char *arg)
 	}
 
 	return 0;
+}
+
+void printHeader()
+{
+	printf("  _________  ___ ___  ___________.____     .____     \n");
+	printf(" /   _____/ /   |   \\ \\_   _____/|    |    |    |    \n");
+	printf(" \\_____  \\ /         \\ |    __)_ |    |    |    |    \n");
+	printf(" /        \\\\    |    / |        \\|    |___ |    |___ \n");
+	printf("/_______  / \\___|_  / /_______  /|_______ \\|_______ \\\n");
+	printf("        \\/        \\/          \\/         \\/        \\/\n");
+	printf("          ___ ___     _           _   _           \n");
+	printf(" |\\/|  /\\  |   | |_| |_ \\    /   | \\ |_  /\\  |\\ | \n");
+	printf(" |  | /--\\ |   | | | |_  \\/\\/    |_/ |_ /--\\ | \\| \n");
+	printf("            _\n");
+	printf("  /\\  |\\ | | \\ \n");
+	printf(" /--\\ | \\| |_/ \n");
+	printf("      _              _               \n");
+	printf("   | / \\ |_| |\\ |   |_) \\_/ /\\  |\\ | \n");
+	printf(" \\_| \\_/ | | | \\|   | \\  | /--\\ | \\| \n\n");
 }

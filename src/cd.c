@@ -25,7 +25,7 @@ int main(int argc, char **argv)
 {
 	if(argc > 2)
 	{
-		printf("Wrong number of arguments! Usage: cd {path}\n");
+		printf("ERROR: Wrong number of arguments! Usage: cd {path}\n");
 		exit(1);
 	}
 
@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 
 	if (FILE_SYSTEM_ID == NULL)
    	{
-      		printf("Could not open the floppy drive or image.\n");
+      		printf("ERROR: Could not open the floppy drive or image.\n");
       		exit(1);
    	}
 
@@ -56,12 +56,12 @@ int main(int argc, char **argv)
 	
 	if(flc == -1)
 	{
-		printf("Directory could not be found.\n");
+		printf("ERROR: Directory could not be found.\n");
 		exit(1);
 	}
 	if(flc == -2)
 	{
-		printf("The specified path leads to a file, not a directory.\n");
+		printf("ERROR: The specified path leads to a file, not a directory.\n");
 		exit(1);
 	}
 

@@ -25,12 +25,12 @@ int main(int argc, char **argv)
 {
 	if(argc > 2)
 	{
-		printf("Too many arguments! Usage: cat {file}\n");
+		printf("ERROR: Too many arguments! Usage: cat {file}\n");
 		exit(1);
 	}
 	if(argc == 1)
 	{
-		printf("Too few arguments! Usage: cat {file}\n");
+		printf("ERROR: Too few arguments! Usage: cat {file}\n");
 		exit(1);
 	}
 
@@ -43,7 +43,7 @@ int main(int argc, char **argv)
 
 	if (FILE_SYSTEM_ID == NULL)
 	{
-   		printf("Could not open the floppy drive or image.\n");
+   		printf("ERROR: Could not open the floppy drive or image.\n");
    		exit(1);
 	}
 
@@ -51,13 +51,13 @@ int main(int argc, char **argv)
 
 	if(flc == -2)
 	{
-		printf("Specified path leads to a directory, not a file.\n");
+		printf("ERROR: Specified path leads to a directory, not a file.\n");
 		exit(1);
 	}
 
 	if(flc < 0)
 	{
-		printf("File not found.\n");
+		printf("ERROR: File not found.\n");
 		exit(1);
 	}
 

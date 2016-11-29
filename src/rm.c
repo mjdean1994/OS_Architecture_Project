@@ -25,12 +25,12 @@ int main(int argc, char **argv)
 {
 	if(argc > 2)
 	{
-		printf("Too many arguments! Usage: rm {path}\n");
+		printf("ERROR: Too many arguments! Usage: rm {path}\n");
 		exit(1);
 	}
 	if(argc == 1)
 	{
-		printf("Too few arguments! Usage: rm {path}\n");
+		printf("ERROR: Too few arguments! Usage: rm {path}\n");
 		exit(1);
 	}
 
@@ -43,7 +43,7 @@ int main(int argc, char **argv)
 
 	if (FILE_SYSTEM_ID == NULL)
 	{
-   		printf("Could not open the floppy drive or image.\n");
+   		printf("ERROR: Could not open the floppy drive or image.\n");
    		exit(1);
 	}
 
@@ -54,13 +54,13 @@ int main(int argc, char **argv)
 
 	if(flc == -2)
 	{
-		printf("Specified path leads to a directory, not a file.\n");
+		printf("ERROR: Specified path leads to a directory, not a file.\n");
 		exit(1);
 	}
 
 	if(flc < 0)
 	{
-		printf("File or directory not found.\n");
+		printf("ERROR: File or directory not found.\n");
 		exit(1);
 	}
 
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
             // if it is a directory (aka not a file), return -2
             if((file.attributes & 0x10) == 0x10)
             {
-            	printf("Path refers to a directory, not a file.\n");
+            	printf("ERROR: Path refers to a directory, not a file.\n");
                exit(1);
             }
             clusterBytes[entryOffset] = 0xE5;
@@ -126,6 +126,6 @@ int main(int argc, char **argv)
       }
    } while (nextCluster > 0x00 && nextCluster < 0xFF0);
 
-   	printf("Unable to locate file.\n");
+   	printf("ERROR: Unable to locate file.\n");
 	exit(1);
 }
