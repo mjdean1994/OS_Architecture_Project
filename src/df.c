@@ -1,4 +1,20 @@
 /*
+	Authors:	Matthew Dean, John Ryan
+	
+	Description:	This program is an implementation of the FAT12 file system, optimized for
+			execution on 64-bit Ubuntu 16.02 LTS
+
+	Certification of Authenticity:
+	As curators of this code, we certify that all code presented is our original intellectual property
+	or has been cited appropriately. 
+
+	Reservation of Intellectual Property Rights:
+	As curators of this code, we reserve all rights to this code (where not otherwise cited) as
+	intellectual property and do not release it for unreferenced redistribution. However, we do
+	allow and encourage inspiration to be drawn from this code and welcome use of our code with
+	proper citation.
+*/
+/*
 Yeah! Come on, come on, come on, come on 
 Now touch me, baby 
 Can't you see that I am not afraid? 
