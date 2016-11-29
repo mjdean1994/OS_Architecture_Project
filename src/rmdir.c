@@ -21,16 +21,18 @@
 
 FILE* FILE_SYSTEM_ID;
 
+void resetFatEntry(int flc, char *fat);
+
 int main(int argc, char **argv)
 {
 	if(argc > 2)
 	{
-		printf("Too many arguments! Usage: rmdir {path}\n");
+		printf("ERROR: Too many arguments! Usage: rmdir {path}\n");
 		exit(1);
 	}
 	if(argc == 1)
 	{
-		printf("Too few argume nts! Usage: rmdir {path}\n");
+		printf("ERROR: Too few argume nts! Usage: rmdir {path}\n");
 		exit(1);
 	}
 
@@ -43,7 +45,7 @@ int main(int argc, char **argv)
 
 	if (FILE_SYSTEM_ID == NULL)
    	{
-      		printf("Could not open the floppy drive or image.\n");
+      		printf("ERROR: Could not open the floppy drive or image.\n");
       		exit(1);
    	}
 
@@ -51,13 +53,13 @@ int main(int argc, char **argv)
 
 	if(flc == -2)
 	{
-		printf("Specified path leads to a directory, not a file.\n");
+		printf("ERROR: Specified path leads to a directory, not a file.\n");
 		exit(1);
 	}
 
 	if(flc < 0)
 	{
-		printf("File or directory not found.\n");
+		printf("ERROR: File or directory not found.\n");
 		exit(1);
 	}
 
@@ -95,33 +97,23 @@ int main(int argc, char **argv)
          FileStructure file;
          int entryOffset = j * 32;
 
-         file.filename = malloc(9 * sizeof(char));
-         int k;
-         // loop through each character of the filename
-         for(k = 0; k < 8 && clusterBytes[entryOffset + k] != ' ' && clusterBytes[entryOffset + k] != '\0'; k++)
-         {
-            file.filename[k] = clusterBytes[entryOffset + k];
-         }
-         file.filename[k] = '\0'; 
+         file = getFileAtEntry(clusterBytes + entryOffset);
 
-         if(strcmp(file.filename, targetName) == 0)
+         if(fileMatchesTarget(file, targetName) == 0)
          {
-            file.attributes = clusterBytes[entryOffset + 11];
-            file.flc = ((((int) clusterBytes[entryOffset + 27]) << 8 ) & 0x0000ff00)
-         | (((int) clusterBytes[entryOffset + 26]) & 0x000000ff);
+            
 
             // if it isnt a directory (aka a file), exit
             if((file.attributes & 0x10) != 0x10)
             {
-            	printf("Path refers to a file, not a directory.\n");
+            	printf("ERROR: Path refers to a file, not a directory.\n");
                exit(1);
             }
 
             int count = countEntriesInFlc(file.flc);
-
             if(count > 2)
             {
-               printf("Directory is not empty. Cannot delete.\n");
+               printf("ERROR: Directory is not empty. Cannot delete.\n");
                exit(1);
             }
 
@@ -130,8 +122,9 @@ int main(int argc, char **argv)
 
             char *tmp = malloc(BYTES_PER_SECTOR * sizeof(char));
             tmp = readFAT12Table(1);
-            get_fat_entry(file.flc, tmp);
-            set_fat_entry(file.flc, 0x00, tmp);
+            
+            resetFatEntry(file.flc, tmp);
+            saveFAT12Table(1, tmp);
             
             return 0;
          }
@@ -146,4 +139,15 @@ int main(int argc, char **argv)
 
    	printf("Unable to locate directory.\n");
 	exit(1);
+}
+
+void resetFatEntry(int flc, char *fat)
+{
+   int entry = get_fat_entry(flc, fat);
+   if(entry > 0 && entry < 0xFF0)
+   {
+      resetFatEntry(entry, fat);
+   }
+
+   set_fat_entry(flc, 0x00, fat);
 }

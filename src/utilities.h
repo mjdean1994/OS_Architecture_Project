@@ -568,6 +568,12 @@ int searchForFileDirectory(char *targetPath, int flc)
 
    int depth = split(targetPath, &directoryComponents, "/\n");
 
+   //if depth is 1, we're already where we need to be
+   if(depth == 1)
+   {
+      return flc;
+   }
+
    int i;
 
    // if the directory does exist, this loop will execute exactly
@@ -663,16 +669,9 @@ int countEntriesInFlc(int flc)
          FileStructure file;
          int entryOffset = j * 32;
 
-         file.filename = malloc(9 * sizeof(char));
-         int k;
-         // loop through each character of the filename
-         for(k = 0; k < 8 && clusterBytes[entryOffset + k] != ' ' && clusterBytes[entryOffset + k] != '\0'; k++)
-         {
-            file.filename[k] = clusterBytes[entryOffset + k];
-         }
-         file.filename[k] = '\0'; 
-         
-         if(clusterBytes[entryOffset] != 0x00 && clusterBytes[entryOffset] != 0xe5)
+         file = getFileAtEntry(clusterBytes + entryOffset);
+
+         if(clusterBytes[entryOffset] != 0x00 && clusterBytes[entryOffset] != 0xe5 && file.attributes != 0x0F)
          {
             count = count + 1;
          }

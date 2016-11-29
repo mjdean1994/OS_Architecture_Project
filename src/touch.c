@@ -139,71 +139,71 @@ int main(int argc, char **argv)
          if(clusterBytes[entryOffset] == 0xe5 || clusterBytes[entryOffset] == 0x00)
          {
             int oldByteStart = clusterBytes[entryOffset];
-         	long cluster = findFreeCluster();
-         	if(cluster < 0)
-         	{
-         		printf("ERROR: The file system is full. Cannot touch.\n");
-         	}
+      	long cluster = findFreeCluster();
+      	if(cluster < 0)
+      	{
+      		printf("ERROR: The file system is full. Cannot touch.\n");
+      	}
 
-         	int i = 0;
+      	int i = 0;
 
-         	//set the name
-         		if(targetName[0] == '.')
-         		{
-         			printf("ERROR: File name cannot start with '.'\n");
-         			exit(1);
-         		}
-         		char **parts;
-         		int partCount = split(targetName, &parts, ".\\");
-         		
-         		if(partCount == 2)
-         		{
-         			char *fileName = parts[0];
-         			for(i = 0; i < 8 && fileName[i] != '\0'; i++)
-		         	{
-		         		clusterBytes[entryOffset + i] = fileName[i];
-		         	}
-		         	if(i < 7)
-		         	{
-		         		clusterBytes[entryOffset + i] = '\0';
-		         	}
-		         	char *extension = parts[1];
-		         	for(i = 8; i < 11 || extension[i - 8] != '\0'; i++)
-		         	{
-		         		clusterBytes[entryOffset + i] = extension[i - 8];
-		         	}
-		         	if(i < 10)
-		         	{
-		         		clusterBytes[entryOffset + i] = '\0';
-		         	}
-         		}
-         		else
-         		{
-         			for(i = 0; i < 8 && targetName[i] != '\0'; i++)
-		         	{
-		         		clusterBytes[entryOffset + i] = targetName[i];
-		         	}
-		         	if(i <= 7)
-		         	{
-		         		clusterBytes[entryOffset + i] = '\0';
-		         	}
-		         	clusterBytes[entryOffset + 8] = '\0';
-         		}
+      	//set the name
+      		if(targetName[0] == '.')
+      		{
+      			printf("ERROR: File name cannot start with '.'\n");
+      			exit(1);
+      		}
+      		char **parts;
+      		int partCount = split(targetName, &parts, ".\\");
+      		
+      		if(partCount == 2)
+      		{
+      			char *fileName = parts[0];
+      			for(i = 0; i < 8 && fileName[i] != '\0'; i++)
+	         	{
+	         		clusterBytes[entryOffset + i] = fileName[i];
+	         	}
+	         	if(i < 7)
+	         	{
+	         		clusterBytes[entryOffset + i] = '\0';
+	         	}
+	         	char *extension = parts[1];
+	         	for(i = 8; i < 11 || extension[i - 8] != '\0'; i++)
+	         	{
+	         		clusterBytes[entryOffset + i] = extension[i - 8];
+	         	}
+	         	if(i < 10)
+	         	{
+	         		clusterBytes[entryOffset + i] = '\0';
+	         	}
+      		}
+      		else
+      		{
+      			for(i = 0; i < 8 && targetName[i] != '\0'; i++)
+	         	{
+	         		clusterBytes[entryOffset + i] = targetName[i];
+	         	}
+	         	if(i <= 7)
+	         	{
+	         		clusterBytes[entryOffset + i] = '\0';
+	         	}
+	         	clusterBytes[entryOffset + 8] = '\0';
+      		}
 
-         		clusterBytes[entryOffset + 11] = 0x00;
-         		clusterBytes[entryOffset + 26] = cluster & 0x00ff;
-               clusterBytes[entryOffset + 27] = (cluster & 0xff00) >> 16;
-         		clusterBytes[entryOffset + 28] = 0;
-         		clusterBytes[entryOffset + 29] = 0;
-         		clusterBytes[entryOffset + 30] = 0;
-         		clusterBytes[entryOffset + 31] = 0;
-         	
-               unsigned char *clusterFileBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
+      		clusterBytes[entryOffset + 11] = 0x00;
+      		clusterBytes[entryOffset + 26] = cluster & 0x00ff;
+            clusterBytes[entryOffset + 27] = (cluster & 0xff00) >> 16;
+      		clusterBytes[entryOffset + 28] = 0;
+      		clusterBytes[entryOffset + 29] = 0;
+      		clusterBytes[entryOffset + 30] = 0;
+      		clusterBytes[entryOffset + 31] = 0;
+      	
+            unsigned char *clusterFileBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
 
-               int numFileBytes = read_sector(cluster + 31, clusterFileBytes);
-               clusterFileBytes[0] = '\0';
-               clusterFileBytes[1] = '\0';
-               write_sector(cluster + 31, clusterFileBytes);
+            int numFileBytes = read_sector(cluster + 31, clusterFileBytes);
+            clusterFileBytes[0] = '\0';
+            clusterFileBytes[1] = '\0';
+            write_sector(cluster + 31, clusterFileBytes);
 
 
          	if(j != 15  && oldByteStart == 0x00)
