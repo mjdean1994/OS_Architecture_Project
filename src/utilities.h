@@ -697,7 +697,6 @@ int findFreeCluster()
       int entry = get_fat_entry(i, fat);
       if(entry == 0x00)
       {
-         printf("Returning %d\n", i);
          return i;
       }
    }

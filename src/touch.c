@@ -198,6 +198,13 @@ int main(int argc, char **argv)
          		clusterBytes[entryOffset + 30] = 0;
          		clusterBytes[entryOffset + 31] = 0;
          	
+               unsigned char *clusterFileBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
+
+               int numFileBytes = read_sector(cluster + 31, clusterFileBytes);
+               clusterFileBytes[0] = '\0';
+               clusterFileBytes[1] = '\0';
+               write_sector(cluster + 31, clusterFileBytes);
+
 
          	if(j != 15  && oldByteStart == 0x00)
          	{
@@ -317,6 +324,12 @@ int main(int argc, char **argv)
    clusterBytes[29] = 0;
    clusterBytes[30] = 0;
    clusterBytes[31] = 0;
+
+   unsigned char *clusterFileBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
+
+   int numFileBytes = read_sector(cluster + 31, clusterFileBytes);
+   clusterFileBytes[0] = '\0';
+   write_sector(cluster + 31, clusterFileBytes);
 
 
    //if we replaced the last entry, we need to set the next entry to be the last entry
