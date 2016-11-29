@@ -18,13 +18,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "bootInfo.h"
 #include "utilities.h"
 #include "sharedMemory.h"
 
 FILE* FILE_SYSTEM_ID;
-
-struct bootInfo BOOT_SECTOR;
 
 extern int read_sector(int sector_number, unsigned char* buffer);
 void readBootSector(unsigned char* boot);
@@ -58,68 +55,7 @@ int main(int argc, char **argv)
 	return 0;
 }
 
-void readBootSector(unsigned char* boot)
-{
-	int endBits;
-   	int startBits;
-	int mid1Bits;
-	int mid2Bits;
-	int index = 0;
 
-	endBits  = ( ( (int) boot[12] ) << 8 ) & 0x0000ff00;
-   	startBits =   ( (int) boot[11] )        & 0x000000ff;
-	
-
-	BOOT_SECTOR.numBytesPerSector = endBits | startBits;
-	BOOT_SECTOR.numSectorsPerCluster = ((int) boot[13]);
-
-	endBits  = ( ( (int) boot[15] ) << 8 ) & 0x0000ff00;
-   	startBits =   ( (int) boot[14] )        & 0x000000ff;
-
-	BOOT_SECTOR.numReservedSectors = endBits | startBits;
-	BOOT_SECTOR.numOfFATS = ((int) boot[16]);
-
-	endBits  = ( ( (int) boot[18] ) << 8 ) & 0x0000ff00;
-   	startBits =   ( (int) boot[17] )        & 0x000000ff;
-	BOOT_SECTOR.numRootEntries = endBits | startBits;
-
-	endBits  = ( ( (int) boot[20] ) << 8 ) & 0x0000ff00;
-   	startBits =   ( (int) boot[19] )        & 0x000000ff;
-	BOOT_SECTOR.numTotalSector = endBits | startBits;
-
-	endBits  = ( ( (int) boot[23] ) << 8 ) & 0x0000ff00;
-   	startBits =   ( (int) boot[22] )        & 0x000000ff;
-	
-	BOOT_SECTOR.numSectorsPerFAT = endBits | startBits;
-
-	endBits  = ( ( (int) boot[25] ) << 8 ) & 0x0000ff00;
-   	startBits =   ( (int) boot[24] )        & 0x000000ff;
-	BOOT_SECTOR.numSectorsPerTrack = endBits | startBits;
-
-	endBits  = ( ( (int) boot[27] ) << 8 ) & 0x0000ff00;
-   	startBits =   ( (int) boot[26] )        & 0x000000ff;
-	BOOT_SECTOR.numHeads = endBits | startBits;
-
-	BOOT_SECTOR.hexBootSignature = ((int) boot[38]);
-
-	endBits = (((int) boot[42]) << 24 ) & 0xff000000;
-	mid2Bits = (((int) boot[41]) << 16 ) & 0x00ff0000;
-	mid1Bits = (((int) boot[40]) << 8 ) & 0x0000ff00;
-	startBits = ((int) boot[39]) & 0x000000ff;
-	BOOT_SECTOR.hexVolumeID = endBits | mid2Bits | mid1Bits | startBits;
-
-	int byteNum = 43;
-	for(; index < 11; index = index + 1){
-		BOOT_SECTOR.volLabel[index] = ((char) boot[byteNum]);
-		byteNum = byteNum + 1;
-	}
-	
-	byteNum = 54;
-	for(index = 0; index < 8; index = index + 1){
-		BOOT_SECTOR.fileSystem[index] = ((char) boot[byteNum]);
-		byteNum = byteNum + 1;
-	}
-}
 
 void printBootSector()
 {

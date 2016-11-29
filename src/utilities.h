@@ -18,10 +18,12 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "bootInfo.h"
 
 size_t MAX_INPUT_LENGTH = 256;
 int BYTES_PER_SECTOR = 512;
 int FAT_SECTORS_NUM = 9;
+struct bootInfo BOOT_SECTOR;
 
 typedef struct _fileStructure
 {
@@ -686,12 +688,97 @@ int countEntriesInFlc(int flc)
    return count;
 }
 
+void saveFAT12Table(int table, unsigned char *fat)
+{
+   int i;
+
+   for(i = 0; i < FAT_SECTORS_NUM; i++)
+   {
+      write_sector(i + 1, fat + (i * BYTES_PER_SECTOR));
+   }
+}
+
+void readBootSector(unsigned char* boot)
+{
+   int endBits;
+      int startBits;
+   int mid1Bits;
+   int mid2Bits;
+   int index = 0;
+
+   endBits  = ( ( (int) boot[12] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[11] )        & 0x000000ff;
+   
+
+   BOOT_SECTOR.numBytesPerSector = endBits | startBits;
+   BOOT_SECTOR.numSectorsPerCluster = ((int) boot[13]);
+
+   endBits  = ( ( (int) boot[15] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[14] )        & 0x000000ff;
+
+   BOOT_SECTOR.numReservedSectors = endBits | startBits;
+   BOOT_SECTOR.numOfFATS = ((int) boot[16]);
+
+   endBits  = ( ( (int) boot[18] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[17] )        & 0x000000ff;
+   BOOT_SECTOR.numRootEntries = endBits | startBits;
+
+   endBits  = ( ( (int) boot[20] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[19] )        & 0x000000ff;
+   BOOT_SECTOR.numTotalSector = endBits | startBits;
+
+   endBits  = ( ( (int) boot[23] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[22] )        & 0x000000ff;
+   
+   BOOT_SECTOR.numSectorsPerFAT = endBits | startBits;
+
+   endBits  = ( ( (int) boot[25] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[24] )        & 0x000000ff;
+   BOOT_SECTOR.numSectorsPerTrack = endBits | startBits;
+
+   endBits  = ( ( (int) boot[27] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[26] )        & 0x000000ff;
+   BOOT_SECTOR.numHeads = endBits | startBits;
+
+   BOOT_SECTOR.hexBootSignature = ((int) boot[38]);
+
+   endBits = (((int) boot[42]) << 24 ) & 0xff000000;
+   mid2Bits = (((int) boot[41]) << 16 ) & 0x00ff0000;
+   mid1Bits = (((int) boot[40]) << 8 ) & 0x0000ff00;
+   startBits = ((int) boot[39]) & 0x000000ff;
+   BOOT_SECTOR.hexVolumeID = endBits | mid2Bits | mid1Bits | startBits;
+
+   int byteNum = 43;
+   for(; index < 11; index = index + 1){
+      BOOT_SECTOR.volLabel[index] = ((char) boot[byteNum]);
+      byteNum = byteNum + 1;
+   }
+   
+   byteNum = 54;
+   for(index = 0; index < 8; index = index + 1){
+      BOOT_SECTOR.fileSystem[index] = ((char) boot[byteNum]);
+      byteNum = byteNum + 1;
+   }
+}
+
 int findFreeCluster()
 {
    unsigned char *fat = readFAT12Table(1);
 
+   unsigned char* boot = (unsigned char*) malloc(BYTES_PER_SECTOR * sizeof(unsigned char));
+
+      if (read_sector(0, boot) == -1)
+      {
+         printf("ERROR: Failed to read Boot Sector.\n");
+         exit(1);
+      }
+
+   readBootSector(boot);
+
+   int totalBlocksNum = BOOT_SECTOR.numTotalSector - 31;
+
    int i;
-   for(i = 0; i < FAT_SECTORS_NUM * BYTES_PER_SECTOR; i++)
+   for(i = 2; i < totalBlocksNum; i++)
    {
       int entry = get_fat_entry(i, fat);
       if(entry == 0x00)
@@ -707,9 +794,22 @@ int countFreeClusters()
 {
    unsigned char *fat = readFAT12Table(1);
 
+   unsigned char* boot = (unsigned char*) malloc(BYTES_PER_SECTOR * sizeof(unsigned char));
+
+      if (read_sector(0, boot) == -1)
+      {
+         printf("ERROR: Failed to read Boot Sector.\n");
+         exit(1);
+      }
+
+   readBootSector(boot);
+
+   int totalBlocksNum = BOOT_SECTOR.numTotalSector - 31;
+
+
    int count = 0;
    int i;
-   for(i = 2; i < FAT_SECTORS_NUM * BYTES_PER_SECTOR; i++)
+   for(i = 2; i < totalBlocksNum; i++)
    {
       int entry = get_fat_entry(i, fat);
       if(entry == 0x00)
@@ -719,14 +819,4 @@ int countFreeClusters()
    }
 
    return count;
-}
-
-void saveFAT12Table(int table, unsigned char *fat)
-{
-   int i;
-
-   for(i = 0; i < FAT_SECTORS_NUM; i++)
-   {
-      write_sector(i + 1, fat + (i * BYTES_PER_SECTOR));
-   }
 }

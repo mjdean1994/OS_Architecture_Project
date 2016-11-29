@@ -68,8 +68,21 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	unsigned char* boot = (unsigned char*) malloc(BYTES_PER_SECTOR * sizeof(unsigned char));
+
+      if (read_sector(0, boot) == -1)
+      {
+         printf("ERROR: Failed to read Boot Sector.\n");
+         exit(1);
+      }
+
+   readBootSector(boot);
+
+   int total = BOOT_SECTOR.numTotalSector - 33;
+
+
 	int count = countFreeClusters();
-	int total = BYTES_PER_SECTOR * FAT_SECTORS_NUM;
+
 	printf("Disk Usage:\n");
 	printf("Free    - %d\n", count);
 	printf("Used    - %d\n", total - count);
