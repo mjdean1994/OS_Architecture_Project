@@ -1,3 +1,10 @@
+Run 'make' in the main project directory to build the project. You should then change your directory to the build directory and use ./shell {floppyFileName} to run the program, where floppyFileName is the name of the floppy image you'd like to load into the shell.
+
+The code authors reserve all rights to this code and do not authorize replication of code featured in this project without proper citation.
+
+
+
+
 ## Synopsis
 
 This project is an implementation of the FAT12 file system for Champlain College's Operating Systems Architecture course (CSI-385). The project implements the following commands:
