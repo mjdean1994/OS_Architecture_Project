@@ -50,78 +50,141 @@ typedef struct _fileStructure
 extern FILE* FILE_SYSTEM_ID;
 extern int BYTES_PER_SECTOR;
 
-
-/******************************************************************************
- * read_sector
- *
- * Read the specified sector from the file system and store that sector in the
- * given buffer
- *
- * sector_number:  The number of the sector to read (0, 1, 2, ...)
- * buffer:  The array into which to store the contents of the sector that is
- *          read
- *
- * Return: the number of bytes read, or -1 if the read fails.
- *****************************************************************************/
-
-int read_sector(int sector_number, unsigned char* buffer)
+int countEntriesInFlc(int flc)
 {
-   int bytes_read;
+   unsigned char *fat = readFAT12Table(1);
 
-   if (fseek(FILE_SYSTEM_ID,
-             (long) sector_number * (long) BYTES_PER_SECTOR, SEEK_SET) != 0)
+   unsigned char *clusterBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
+
+   int realCluster;
+   if(flc == 0)
    {
-	   printf("Error accessing sector %d\n", sector_number);
-      return -1;
+      realCluster = 19;
+   }
+   else
+   {
+      realCluster = 31 + flc;
    }
 
-   bytes_read = fread(buffer, sizeof(char), BYTES_PER_SECTOR, FILE_SYSTEM_ID);
+   int numBytes = read_sector(realCluster, clusterBytes);
 
-   if (bytes_read != BYTES_PER_SECTOR)
-   {
-      printf("Error reading sector %d\n", sector_number);
-      return -1;
-   }
+   int count = 0;
+   int j;
 
-   return bytes_read;
+   for(j = 0; j < 16; j++)
+      {
+         FileStructure file;
+         int entryOffset = j * 32;
+
+         file = getFileAtEntry(clusterBytes + entryOffset);
+
+         if(clusterBytes[entryOffset] != 0x00 && clusterBytes[entryOffset] != 0xe5 && file.attributes != 0x0F)
+         {
+            count = count + 1;
+         }
+
+         if(clusterBytes[entryOffset] == 0x00)
+         {
+            return count;
+         }
+
+      }
+
+   return count;
 }
 
-
-/*****************************************************************************
- * write_sector
- *
- * Write the contents of the given buffer to the filesystem at the specified
- * sector
- *
- * sector_number:  The number of the sector to write (0, 1, 2, ...)
- * buffer:  The array whose contents are to be written
- *
- * Return: the number of bytes written, or -1 if the read fails.
- ****************************************************************************/
-
-int write_sector(int sector_number, unsigned char* buffer) 
+int countFreeClusters()
 {
-   int bytes_written;
+   unsigned char *fat = readFAT12Table(1);
 
-   if (fseek(FILE_SYSTEM_ID,
-       (long) sector_number * (long) BYTES_PER_SECTOR, SEEK_SET) != 0) 
+   unsigned char* boot = (unsigned char*) malloc(BYTES_PER_SECTOR * sizeof(unsigned char));
+
+      if (read_sector(0, boot) == -1)
+      {
+         printf("ERROR: Failed to read Boot Sector.\n");
+         exit(1);
+      }
+
+   readBootSector(boot);
+
+   int totalBlocksNum = BOOT_SECTOR.numTotalSector - 31;
+
+
+   int count = 0;
+   int i;
+   for(i = 2; i < totalBlocksNum; i++)
    {
-      printf("Error accessing sector %d\n", sector_number);
-      return -1;
+      int entry = get_fat_entry(i, fat);
+      if(entry == 0x00)
+      {
+         count++;
+      }
    }
 
-   bytes_written = fwrite(buffer,
-                          sizeof(char), BYTES_PER_SECTOR, FILE_SYSTEM_ID);
-
-   if (bytes_written != BYTES_PER_SECTOR) 
-   {
-      printf("Error reading sector %d\n", sector_number);
-      return -1;
-   }
-
-   return bytes_written;
+   return count;
 }
 
+int fileMatchesTarget(FileStructure file, char *targetName)
+{
+   if(strcmp("..", targetName) == 0 || strcmp(".", targetName) == 0)
+   {
+      return strcasecmp(file.filename, targetName);
+   }
+
+   char **targetArgs;
+   char *stringToSplit = malloc(BYTES_PER_SECTOR * sizeof(char));
+   strcpy(stringToSplit, targetName);
+   int count = split(stringToSplit, &targetArgs, ".\n");
+   if(count == 1)
+   {
+      //if no extension, we need to make sure the file has no extension.
+      if(file.extension[0] != ' ' && file.extension[0] != '\0')
+      {
+         return 1;
+      }
+
+      return strcasecmp(file.filename, targetArgs[0]);
+   }
+
+   if(strcasecmp(file.filename, targetArgs[0]) == 0)
+   {
+      if(strcasecmp(file.extension, targetArgs[1]) == 0)
+      {
+         return 0;
+      }
+   } 
+
+   return 1;
+}
+
+int findFreeCluster()
+{
+   unsigned char *fat = readFAT12Table(1);
+
+   unsigned char* boot = (unsigned char*) malloc(BYTES_PER_SECTOR * sizeof(unsigned char));
+
+      if (read_sector(0, boot) == -1)
+      {
+         printf("ERROR: Failed to read Boot Sector.\n");
+         exit(1);
+      }
+
+   readBootSector(boot);
+
+   int totalBlocksNum = BOOT_SECTOR.numTotalSector - 31;
+
+   int i;
+   for(i = 2; i < totalBlocksNum; i++)
+   {
+      int entry = get_fat_entry(i, fat);
+      if(entry == 0x00)
+      {
+         return i;
+      }
+   }
+
+   return -1;
+}
 
 /*****************************************************************************
  * get_fat_entry
@@ -161,63 +224,52 @@ int get_fat_entry(int fat_entry_number, unsigned char* fat)
    }
 }
 
-
-/******************************************************************************
- * set_fat_entry
- *
- * Set the specified entry in the given FAT to the given value
- *
- * fat_entry_number:  The number of the FAT entry to set (0, 1, 2, ...)
- * value:  The given value to place in the FAT entry
- * fat:  The fat table in which to set the given value at the specified entry
- *****************************************************************************/
-
-void set_fat_entry(int fat_entry_number, int value, unsigned char* fat) 
+char *getCurrentDirectory(char *previousDirectory, char *newPath)
 {
-   int offset;
-   int uv, wx, yz, a, b, c;
-
-   offset = 3 * fat_entry_number / 2;
-
-   // Two FAT12 entries are stored into three bytes;
-   // if these bytes are uv,wx,yz then the two FAT12 entries are xuv and yzw
-   // Let 0a,bc denote the fat_entry_number, written as two bytes (high and
-   // low, respectively)
-
-   a = value & 0x0f00;
-   b = value & 0x00f0;
-   c = value & 0x000f;
-
-   // odd fat entry number, change yzw to abc, i.e.,
-   if (fat_entry_number & 0x0001) 
+   //if it's an absolute path, might as well start at the beginning
+   if(newPath[0] == '/')
    {
-      // wx = cx;
-      fat[offset]     = (unsigned char) ((c << 4)  |  (fat[offset] & 0x000f));
-      // yz = ab;
-      fat[offset + 1] = (unsigned char) ((a >> 4)  |  (b >> 4));
+      previousDirectory = "/";
    }
-   // even fat entry number, change xuv to abc, i.e.,
-   else
-   {
-      // uv = bc;
-      fat[offset]     = (unsigned char) (b | c);
-      // wx = wa;
-      fat[offset + 1] = (unsigned char) ((fat[offset + 1]  & 
-                                          0x00f0)  |  (a >> 8));
-   }
-}
 
-unsigned char* readFAT12Table(int fatIndex)
-{
-   unsigned char* fat = (unsigned char*)malloc(BYTES_PER_SECTOR * FAT_SECTORS_NUM);
+   char **newComponents;
+   int newCount = split(newPath, &newComponents, "/\n");
+
+   char **oldComponents;
+   int oldCount = split(previousDirectory, &oldComponents, "/\n");
+
+   char **compiledComponents = malloc((newCount + oldCount) * sizeof(char));
+
    int i;
-
-   // 9 because there are 9 fat sectors
-   for(i = 0; i < FAT_SECTORS_NUM; i++)
+   for(i = 0; i < oldCount; i++)
    {
-      read_sector(i + 1, &fat[i * BYTES_PER_SECTOR]);
+      compiledComponents[i] = oldComponents[i];
    }
-   return fat;   
+
+   int j;
+   for(j = 0; j < newCount; j++)
+   {
+      if(strcasecmp(newComponents[j], "..") == 0)
+      {
+         i--;
+      }
+      else
+      {
+         compiledComponents[i] = newComponents[j];
+      }
+   }
+
+   char *returnPath = malloc(MAX_INPUT_LENGTH * sizeof(char));
+   strcpy(returnPath, "/");
+
+   int k;
+   for(k = 0; k <= i; k++)
+   {
+      strcat(returnPath, compiledComponents[k]);
+      strcat(returnPath, "/");
+   }
+
+   return returnPath;
 }
 
 FileStructure getFileAtEntry(char *entry)
@@ -254,79 +306,185 @@ FileStructure getFileAtEntry(char *entry)
    return file;
 }
 
-/*
-	Summary:	Spilts the given input string where ' ' is the delimiting
-				character.
-	Parameters:
-		input 	The string to be split
-		argv	The string array to fill with the split array
-	Return:		An integer that represents the number of elements in argv
-*/
-int split(char *input, char ***argv, char *delimiter)
+/******************************************************************************
+ * read_sector
+ *
+ * Read the specified sector from the file system and store that sector in the
+ * given buffer
+ *
+ * sector_number:  The number of the sector to read (0, 1, 2, ...)
+ * buffer:  The array into which to store the contents of the sector that is
+ *          read
+ *
+ * Return: the number of bytes read, or -1 if the read fails.
+ *****************************************************************************/
+
+int read_sector(int sector_number, unsigned char* buffer)
 {
-	int count = 0;
+   int bytes_read;
 
-	char *freshInput = malloc(MAX_INPUT_LENGTH * sizeof(char*));
-	
-   strcpy(freshInput, input);
+   if (fseek(FILE_SYSTEM_ID,
+             (long) sector_number * (long) BYTES_PER_SECTOR, SEEK_SET) != 0)
+   {
+	   printf("Error accessing sector %d\n", sector_number);
+      return -1;
+   }
 
-	char *token;
+   bytes_read = fread(buffer, sizeof(char), BYTES_PER_SECTOR, FILE_SYSTEM_ID);
 
-	token = strtok(input, delimiter);
+   if (bytes_read != BYTES_PER_SECTOR)
+   {
+      printf("Error reading sector %d\n", sector_number);
+      return -1;
+   }
 
-	while(token != NULL)
-	{
-		token = strtok(NULL, delimiter);	// Get next token
-		count++;
-	}
-
-	// Allocate space for the arguments
-	*argv = malloc(count * sizeof(char*));
-
-	token = strtok(freshInput, delimiter);
-	int i = 0;	// Index of array
-
-	while(token != NULL && token[0] != '\n')
-	{
-		(*argv)[i] = strdup(token);
-		token = strtok(NULL, delimiter);	// Get next token
-		i++;
-	}
-
-	return count;
+   return bytes_read;
 }
 
-int fileMatchesTarget(FileStructure file, char *targetName)
+void readBootSector(unsigned char* boot)
 {
-   if(strcmp("..", targetName) == 0 || strcmp(".", targetName) == 0)
-   {
-      return strcasecmp(file.filename, targetName);
-   }
+   int endBits;
+      int startBits;
+   int mid1Bits;
+   int mid2Bits;
+   int index = 0;
 
-   char **targetArgs;
-   char *stringToSplit = malloc(BYTES_PER_SECTOR * sizeof(char));
-   strcpy(stringToSplit, targetName);
-   int count = split(stringToSplit, &targetArgs, ".\n");
-   if(count == 1)
+   endBits  = ( ( (int) boot[12] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[11] )        & 0x000000ff;
+   
+
+   BOOT_SECTOR.numBytesPerSector = endBits | startBits;
+   BOOT_SECTOR.numSectorsPerCluster = ((int) boot[13]);
+
+   endBits  = ( ( (int) boot[15] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[14] )        & 0x000000ff;
+
+   BOOT_SECTOR.numReservedSectors = endBits | startBits;
+   BOOT_SECTOR.numOfFATS = ((int) boot[16]);
+
+   endBits  = ( ( (int) boot[18] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[17] )        & 0x000000ff;
+   BOOT_SECTOR.numRootEntries = endBits | startBits;
+
+   endBits  = ( ( (int) boot[20] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[19] )        & 0x000000ff;
+   BOOT_SECTOR.numTotalSector = endBits | startBits;
+
+   endBits  = ( ( (int) boot[23] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[22] )        & 0x000000ff;
+   
+   BOOT_SECTOR.numSectorsPerFAT = endBits | startBits;
+
+   endBits  = ( ( (int) boot[25] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[24] )        & 0x000000ff;
+   BOOT_SECTOR.numSectorsPerTrack = endBits | startBits;
+
+   endBits  = ( ( (int) boot[27] ) << 8 ) & 0x0000ff00;
+      startBits =   ( (int) boot[26] )        & 0x000000ff;
+   BOOT_SECTOR.numHeads = endBits | startBits;
+
+   BOOT_SECTOR.hexBootSignature = ((int) boot[38]);
+
+   endBits = (((int) boot[42]) << 24 ) & 0xff000000;
+   mid2Bits = (((int) boot[41]) << 16 ) & 0x00ff0000;
+   mid1Bits = (((int) boot[40]) << 8 ) & 0x0000ff00;
+   startBits = ((int) boot[39]) & 0x000000ff;
+   BOOT_SECTOR.hexVolumeID = endBits | mid2Bits | mid1Bits | startBits;
+
+   int byteNum = 43;
+   for(; index < 11; index = index + 1){
+      BOOT_SECTOR.volLabel[index] = ((char) boot[byteNum]);
+      byteNum = byteNum + 1;
+   }
+   
+   byteNum = 54;
+   for(index = 0; index < 8; index = index + 1){
+      BOOT_SECTOR.fileSystem[index] = ((char) boot[byteNum]);
+      byteNum = byteNum + 1;
+   }
+}
+
+unsigned char* readFAT12Table(int fatIndex)
+{
+   unsigned char* fat = (unsigned char*)malloc(BYTES_PER_SECTOR * FAT_SECTORS_NUM);
+   int i;
+
+   // 9 because there are 9 fat sectors
+   for(i = 0; i < FAT_SECTORS_NUM; i++)
    {
-      //if no extension, we need to make sure the file has no extension.
-      if(file.extension[0] != ' ' && file.extension[0] != '\0')
+      read_sector(i + 1, &fat[i * BYTES_PER_SECTOR]);
+   }
+   return fat;   
+}
+
+void saveFAT12Table(int table, unsigned char *fat)
+{
+   int i;
+
+   for(i = 0; i < FAT_SECTORS_NUM; i++)
+   {
+      write_sector(i + 1, fat + (i * BYTES_PER_SECTOR));
+   }
+}
+
+/*
+   Summary: Searches for the existance of a directory within a given directory
+      targetName     the name of the directory to find
+      flc            The first logical cluster of the current dir
+   Return:  the first logical cluster of the found directory
+            or -1 if the directory is not found
+            or -2 if the specified path points to a file
+*/
+int searchDirectoryForFile(char *targetName, int flc)
+{
+   unsigned char *fat = readFAT12Table(1);
+   int nextCluster;
+   // Loop through all clusters...
+   do
+   {
+      nextCluster = get_fat_entry(flc, fat);
+      unsigned char *clusterBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
+
+      int realCluster;
+      if(flc == 0)
       {
-         return 1;
+         realCluster = 19;
+      }
+      else
+      {
+         realCluster = 31 + flc;
       }
 
-      return strcasecmp(file.filename, targetArgs[0]);
-   }
+      int numBytes = read_sector(realCluster, clusterBytes);
 
-   if(strcasecmp(file.filename, targetArgs[0]) == 0)
-   {
-      if(strcasecmp(file.extension, targetArgs[1]) == 0)
+
+      int j;
+      // loop through each entry in cluster...
+      for(j = 0; j < 16; j++)
       {
-         return 0;
-      }
-   } 
+         FileStructure file;
+         int entryOffset = j * 32;
+         file = getFileAtEntry(clusterBytes + entryOffset);
 
-   return 1;
+         if(fileMatchesTarget(file, targetName) == 0)
+         {
+            // if it is a directory, not a file, return -2
+            if((file.attributes & 0x10) == 0x10)
+            {
+               return -2;
+            }
+            return file.flc;
+         }
+
+      }
+
+      if(nextCluster > 0x00 && nextCluster < 0xFF0)
+      {
+         flc = nextCluster;
+      }
+   } while (nextCluster > 0x00 && nextCluster < 0xFF0);
+
+   return -1;
 }
 
 /*
@@ -434,73 +592,13 @@ int searchForDirectory(char *targetPath, int flc)
 }
 
 /*
-   Summary: Searches for the existance of a directory within a given directory
-      targetName     the name of the directory to find
-      flc            The first logical cluster of the current dir
-   Return:  the first logical cluster of the found directory
-            or -1 if the directory is not found
-            or -2 if the specified path points to a file
-*/
-int searchDirectoryForFile(char *targetName, int flc)
-{
-   unsigned char *fat = readFAT12Table(1);
-   int nextCluster;
-   // Loop through all clusters...
-   do
-   {
-      nextCluster = get_fat_entry(flc, fat);
-      unsigned char *clusterBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
-
-      int realCluster;
-      if(flc == 0)
-      {
-         realCluster = 19;
-      }
-      else
-      {
-         realCluster = 31 + flc;
-      }
-
-      int numBytes = read_sector(realCluster, clusterBytes);
-
-
-      int j;
-      // loop through each entry in cluster...
-      for(j = 0; j < 16; j++)
-      {
-         FileStructure file;
-         int entryOffset = j * 32;
-         file = getFileAtEntry(clusterBytes + entryOffset);
-
-         if(fileMatchesTarget(file, targetName) == 0)
-         {
-            // if it is a directory, not a file, return -2
-            if((file.attributes & 0x10) == 0x10)
-            {
-               return -2;
-            }
-            return file.flc;
-         }
-
-      }
-
-      if(nextCluster > 0x00 && nextCluster < 0xFF0)
-      {
-         flc = nextCluster;
-      }
-   } while (nextCluster > 0x00 && nextCluster < 0xFF0);
-
-   return -1;
-}
-
-/*
-   Summary: Searches for the existance of a directory at the given path
+   Summary: Searches for the existance of a file at the given path
    Parameters:
-      targetPath     The absolute or relative path to the directory
+      targetPath     The absolute or relative path to the file
       flc            The first logical cluster of the current dir
-   Return:  the first logical cluster of the found directory
-            or -1 if the directory is not found
-            or -2 if the specified path points to a file
+   Return:  the first logical cluster of the found file
+            or -1 if the file is not found
+            or -2 if the specified path points to a directory
 */
 int searchForFile(char *targetPath, int flc)
 {
@@ -597,226 +695,124 @@ int searchForFileDirectory(char *targetPath, int flc)
    return flc;
 }
 
-char *getCurrentDirectory(char *previousDirectory, char *newPath)
+/******************************************************************************
+ * set_fat_entry
+ *
+ * Set the specified entry in the given FAT to the given value
+ *
+ * fat_entry_number:  The number of the FAT entry to set (0, 1, 2, ...)
+ * value:  The given value to place in the FAT entry
+ * fat:  The fat table in which to set the given value at the specified entry
+ *****************************************************************************/
+
+void set_fat_entry(int fat_entry_number, int value, unsigned char* fat) 
 {
-   //if it's an absolute path, might as well start at the beginning
-   if(newPath[0] == '/')
+   int offset;
+   int uv, wx, yz, a, b, c;
+
+   offset = 3 * fat_entry_number / 2;
+
+   // Two FAT12 entries are stored into three bytes;
+   // if these bytes are uv,wx,yz then the two FAT12 entries are xuv and yzw
+   // Let 0a,bc denote the fat_entry_number, written as two bytes (high and
+   // low, respectively)
+
+   a = value & 0x0f00;
+   b = value & 0x00f0;
+   c = value & 0x000f;
+
+   // odd fat entry number, change yzw to abc, i.e.,
+   if (fat_entry_number & 0x0001) 
    {
-      previousDirectory = "/";
+      // wx = cx;
+      fat[offset]     = (unsigned char) ((c << 4)  |  (fat[offset] & 0x000f));
+      // yz = ab;
+      fat[offset + 1] = (unsigned char) ((a >> 4)  |  (b >> 4));
    }
-
-   char **newComponents;
-   int newCount = split(newPath, &newComponents, "/\n");
-
-   char **oldComponents;
-   int oldCount = split(previousDirectory, &oldComponents, "/\n");
-
-   char **compiledComponents = malloc((newCount + oldCount) * sizeof(char));
-
-   int i;
-   for(i = 0; i < oldCount; i++)
-   {
-      compiledComponents[i] = oldComponents[i];
-   }
-
-   int j;
-   for(j = 0; j < newCount; j++)
-   {
-      if(strcasecmp(newComponents[j], "..") == 0)
-      {
-         i--;
-      }
-      else
-      {
-         compiledComponents[i] = newComponents[j];
-      }
-   }
-
-   char *returnPath = malloc(MAX_INPUT_LENGTH * sizeof(char));
-   strcpy(returnPath, "/");
-
-   int k;
-   for(k = 0; k <= i; k++)
-   {
-      strcat(returnPath, compiledComponents[k]);
-      strcat(returnPath, "/");
-   }
-
-   return returnPath;
-}
-
-int countEntriesInFlc(int flc)
-{
-   unsigned char *fat = readFAT12Table(1);
-
-   unsigned char *clusterBytes = malloc(BYTES_PER_SECTOR * sizeof(char));
-
-   int realCluster;
-   if(flc == 0)
-   {
-      realCluster = 19;
-   }
+   // even fat entry number, change xuv to abc, i.e.,
    else
    {
-      realCluster = 31 + flc;
+      // uv = bc;
+      fat[offset]     = (unsigned char) (b | c);
+      // wx = wa;
+      fat[offset + 1] = (unsigned char) ((fat[offset + 1]  & 
+                                          0x00f0)  |  (a >> 8));
    }
-
-   int numBytes = read_sector(realCluster, clusterBytes);
-
-   int count = 0;
-   int j;
-
-   for(j = 0; j < 16; j++)
-      {
-         FileStructure file;
-         int entryOffset = j * 32;
-
-         file = getFileAtEntry(clusterBytes + entryOffset);
-
-         if(clusterBytes[entryOffset] != 0x00 && clusterBytes[entryOffset] != 0xe5 && file.attributes != 0x0F)
-         {
-            count = count + 1;
-         }
-
-         if(clusterBytes[entryOffset] == 0x00)
-         {
-            return count;
-         }
-
-      }
-
-   return count;
 }
 
-void saveFAT12Table(int table, unsigned char *fat)
+/*
+	Summary:	Spilts the given input string where ' ' is the delimiting
+				character.
+	Parameters:
+		input 	The string to be split
+		argv	The string array to fill with the split array
+	Return:		An integer that represents the number of elements in argv
+*/
+int split(char *input, char ***argv, char *delimiter)
 {
-   int i;
+	int count = 0;
 
-   for(i = 0; i < FAT_SECTORS_NUM; i++)
+	char *freshInput = malloc(MAX_INPUT_LENGTH * sizeof(char*));
+	
+   strcpy(freshInput, input);
+
+	char *token;
+
+	token = strtok(input, delimiter);
+
+	while(token != NULL)
+	{
+		token = strtok(NULL, delimiter);	// Get next token
+		count++;
+	}
+
+	// Allocate space for the arguments
+	*argv = malloc(count * sizeof(char*));
+
+	token = strtok(freshInput, delimiter);
+	int i = 0;	// Index of array
+
+	while(token != NULL && token[0] != '\n')
+	{
+		(*argv)[i] = strdup(token);
+		token = strtok(NULL, delimiter);	// Get next token
+		i++;
+	}
+
+	return count;
+}
+
+/*****************************************************************************
+ * write_sector
+ *
+ * Write the contents of the given buffer to the filesystem at the specified
+ * sector
+ *
+ * sector_number:  The number of the sector to write (0, 1, 2, ...)
+ * buffer:  The array whose contents are to be written
+ *
+ * Return: the number of bytes written, or -1 if the read fails.
+ ****************************************************************************/
+
+int write_sector(int sector_number, unsigned char* buffer) 
+{
+   int bytes_written;
+
+   if (fseek(FILE_SYSTEM_ID,
+       (long) sector_number * (long) BYTES_PER_SECTOR, SEEK_SET) != 0) 
    {
-      write_sector(i + 1, fat + (i * BYTES_PER_SECTOR));
+      printf("Error accessing sector %d\n", sector_number);
+      return -1;
    }
-}
 
-void readBootSector(unsigned char* boot)
-{
-   int endBits;
-      int startBits;
-   int mid1Bits;
-   int mid2Bits;
-   int index = 0;
+   bytes_written = fwrite(buffer,
+                          sizeof(char), BYTES_PER_SECTOR, FILE_SYSTEM_ID);
 
-   endBits  = ( ( (int) boot[12] ) << 8 ) & 0x0000ff00;
-      startBits =   ( (int) boot[11] )        & 0x000000ff;
-   
-
-   BOOT_SECTOR.numBytesPerSector = endBits | startBits;
-   BOOT_SECTOR.numSectorsPerCluster = ((int) boot[13]);
-
-   endBits  = ( ( (int) boot[15] ) << 8 ) & 0x0000ff00;
-      startBits =   ( (int) boot[14] )        & 0x000000ff;
-
-   BOOT_SECTOR.numReservedSectors = endBits | startBits;
-   BOOT_SECTOR.numOfFATS = ((int) boot[16]);
-
-   endBits  = ( ( (int) boot[18] ) << 8 ) & 0x0000ff00;
-      startBits =   ( (int) boot[17] )        & 0x000000ff;
-   BOOT_SECTOR.numRootEntries = endBits | startBits;
-
-   endBits  = ( ( (int) boot[20] ) << 8 ) & 0x0000ff00;
-      startBits =   ( (int) boot[19] )        & 0x000000ff;
-   BOOT_SECTOR.numTotalSector = endBits | startBits;
-
-   endBits  = ( ( (int) boot[23] ) << 8 ) & 0x0000ff00;
-      startBits =   ( (int) boot[22] )        & 0x000000ff;
-   
-   BOOT_SECTOR.numSectorsPerFAT = endBits | startBits;
-
-   endBits  = ( ( (int) boot[25] ) << 8 ) & 0x0000ff00;
-      startBits =   ( (int) boot[24] )        & 0x000000ff;
-   BOOT_SECTOR.numSectorsPerTrack = endBits | startBits;
-
-   endBits  = ( ( (int) boot[27] ) << 8 ) & 0x0000ff00;
-      startBits =   ( (int) boot[26] )        & 0x000000ff;
-   BOOT_SECTOR.numHeads = endBits | startBits;
-
-   BOOT_SECTOR.hexBootSignature = ((int) boot[38]);
-
-   endBits = (((int) boot[42]) << 24 ) & 0xff000000;
-   mid2Bits = (((int) boot[41]) << 16 ) & 0x00ff0000;
-   mid1Bits = (((int) boot[40]) << 8 ) & 0x0000ff00;
-   startBits = ((int) boot[39]) & 0x000000ff;
-   BOOT_SECTOR.hexVolumeID = endBits | mid2Bits | mid1Bits | startBits;
-
-   int byteNum = 43;
-   for(; index < 11; index = index + 1){
-      BOOT_SECTOR.volLabel[index] = ((char) boot[byteNum]);
-      byteNum = byteNum + 1;
-   }
-   
-   byteNum = 54;
-   for(index = 0; index < 8; index = index + 1){
-      BOOT_SECTOR.fileSystem[index] = ((char) boot[byteNum]);
-      byteNum = byteNum + 1;
-   }
-}
-
-int findFreeCluster()
-{
-   unsigned char *fat = readFAT12Table(1);
-
-   unsigned char* boot = (unsigned char*) malloc(BYTES_PER_SECTOR * sizeof(unsigned char));
-
-      if (read_sector(0, boot) == -1)
-      {
-         printf("ERROR: Failed to read Boot Sector.\n");
-         exit(1);
-      }
-
-   readBootSector(boot);
-
-   int totalBlocksNum = BOOT_SECTOR.numTotalSector - 31;
-
-   int i;
-   for(i = 2; i < totalBlocksNum; i++)
+   if (bytes_written != BYTES_PER_SECTOR) 
    {
-      int entry = get_fat_entry(i, fat);
-      if(entry == 0x00)
-      {
-         return i;
-      }
+      printf("Error reading sector %d\n", sector_number);
+      return -1;
    }
 
-   return -1;
-}
-
-int countFreeClusters()
-{
-   unsigned char *fat = readFAT12Table(1);
-
-   unsigned char* boot = (unsigned char*) malloc(BYTES_PER_SECTOR * sizeof(unsigned char));
-
-      if (read_sector(0, boot) == -1)
-      {
-         printf("ERROR: Failed to read Boot Sector.\n");
-         exit(1);
-      }
-
-   readBootSector(boot);
-
-   int totalBlocksNum = BOOT_SECTOR.numTotalSector - 31;
-
-
-   int count = 0;
-   int i;
-   for(i = 2; i < totalBlocksNum; i++)
-   {
-      int entry = get_fat_entry(i, fat);
-      if(entry == 0x00)
-      {
-         count++;
-      }
-   }
-
-   return count;
+   return bytes_written;
 }
